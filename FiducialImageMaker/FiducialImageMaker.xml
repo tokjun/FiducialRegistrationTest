@@ -2,7 +2,7 @@
 <executable>
   <category>IGT</category>
   <title>FiducialImageMaker</title>
-  <description><![CDATA[This is a CLI module that can be bundled in an extension]]></description>
+  <description><![CDATA[]]></description>
   <version>0.0.1</version>
   <documentation-url>http://www.example.com/Slicer/Modules/FiducialImageMaker</documentation-url>
   <license>Slicer</license>
@@ -11,27 +11,26 @@
   <parameters>
     <label>IO</label>
     <description><![CDATA[Input/output parameters]]></description>
-    <double>
-      <name>sigma</name>
-      <longflag>sigma</longflag>
-      <flag>s</flag>
-      <label>Sigma</label>
-      <description><![CDATA[A double value (in units of mm) passed to the algorithm]]></description>
-      <default>1.0</default>
-    </double>
     <image>
       <name>inputVolume</name>
       <label>Input Volume</label>
       <channel>input</channel>
       <index>0</index>
-      <description><![CDATA[Input volume]]></description>
+      <description><![CDATA[Volume to use as a background.]]></description>
     </image>
+    <geometry>
+      <name>inputModel</name>
+      <label>Input Model</label>
+      <channel>input</channel>
+      <index>1</index>
+      <description><![CDATA[Fiducial model]]></description>
+    </geometry>
     <image>
       <name>outputVolume</name>
       <label>Output Volume</label>
       <channel>output</channel>
-      <index>1</index>
-      <description><![CDATA[Output Volume]]></description>
+      <index>2</index>
+      <description><![CDATA[Output volume with fiducials.]]></description>
     </image>
   </parameters>
 </executable>

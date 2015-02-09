@@ -52,14 +52,20 @@ public:
 
   typedef itk::Vector< double, 3 > VectorType;
 
+  // Returned values for IsInsideObject(position, spacing)
+  enum {
+    INSIDE_NO,
+    INSIDE_YES,
+    INSIDE_PARTIAL,
+  };
+
+public:
+
   /** Run-time type information (and related methods).   */
   itkTypeMacro( RenderSpatialObjectImageFilter, ImageToImageFilter );
 
   /** Method for creation through the object factory. */
   itkNewMacro(Self);
-
-  itkSetMacro(Label, int);
-  itkGetConstMacro(Label, int);
 
 #ifdef ITK_USE_CONCEPT_CHECKING
   /** Begin concept checking */
@@ -68,15 +74,23 @@ public:
   /** End concept checking */
 #endif
 
-public:
+  void ClearFiducialCenterList() { this->m_FiducialCenterList.clear(); }
+  
+  void AddFiducialCenter(double p[3])
+  {
+    typename InputImageType::PointType point;
+    for (int i = 0; i < 3; i ++) point[i] = p[i];
+    this->m_FiducialCenterList.push_back(point);
+  }
+    
+  itkSetMacro(FiducialRadius, double);
+  itkGetConstMacro(FiducialRadius, double);
 
-  // Returned values for IsInsideObject(position, spacing)
-  enum {
-    INSIDE_NO,
-    INSIDE_YES,
-    INSIDE_PARTIAL,
-  };
+  itkSetMacro(DefaultVoxelValue, double);
+  itkGetConstMacro(DefaultVoxelValue, double);
 
+  itkSetMacro(ToleranceVolume, double);
+  itkGetConstMacro(ToleranceVolume, double);
 
 protected:
   RenderSpatialObjectImageFilter();
@@ -86,16 +100,22 @@ protected:
   /** Generate Data */
   void GenerateData( void );
 
-  double ComputeObjectVolumeInCube(InputImageType::PointType position, InputImageType::SpacingType spacing);
+  double ComputeObjectVolumeInCube(std::vector< VectorType >& vertices);
 
   // Function to determine if the given region is completely inside (INSIDE_YES),
   // partially inside (INSIDE_PARTIAL), or completely outside (INSIDE_NO).
-  virtual int IsInsideObject(position, spacing);
+  virtual int IsInsideObject(std::vector< VectorType >& vertices);
 
 
 private:
   RenderSpatialObjectImageFilter(const Self&); //purposely not implemented
   void operator=(const Self&); //purposely not implemented
+
+  std::vector< typename InputImageType::PointType > m_FiducialCenterList;
+  double m_FiducialRadius;
+
+  double m_DefaultVoxelValue;
+  double m_ToleranceVolume;
   
 };
 

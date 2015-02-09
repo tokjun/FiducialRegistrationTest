@@ -1,10 +1,12 @@
 #include "itkImageFileWriter.h"
+#include "itkImageFileReader.h"
 
-#include "itkSmoothingRecursiveGaussianImageFilter.h"
+#include "FiducialImageMakerCLP.h"
+
 
 #include "itkPluginUtilities.h"
 
-#include "FiducialImageMakerCLP.h"
+#include "itkRenderSpatialObjectImageFilter.h"
 
 // Use an anonymous namespace to keep class types and function names
 // from colliding when module is used as shared object module.  Every
@@ -28,8 +30,12 @@ int DoIt( int argc, char * argv[], T )
   typedef itk::ImageFileReader<InputImageType>  ReaderType;
   typedef itk::ImageFileWriter<OutputImageType> WriterType;
 
+  /*
   typedef itk::SmoothingRecursiveGaussianImageFilter<
     InputImageType, OutputImageType>  FilterType;
+  */
+  typedef itk::RenderSpatialObjectImageFilter<
+    InputImageType, OutputImageType>  FilterType;    
 
   typename ReaderType::Pointer reader = ReaderType::New();
 
@@ -37,7 +43,6 @@ int DoIt( int argc, char * argv[], T )
 
   typename FilterType::Pointer filter = FilterType::New();
   filter->SetInput( reader->GetOutput() );
-  filter->SetSigma( sigma );
 
   typename WriterType::Pointer writer = WriterType::New();
   writer->SetFileName( outputVolume.c_str() );
