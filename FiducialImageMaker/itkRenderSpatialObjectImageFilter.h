@@ -68,6 +68,15 @@ public:
   /** End concept checking */
 #endif
 
+public:
+
+  // Returned values for IsInsideObject(position, spacing)
+  enum {
+    INSIDE_NO,
+    INSIDE_YES,
+    INSIDE_PARTIAL,
+  };
+
 
 protected:
   RenderSpatialObjectImageFilter();
@@ -76,6 +85,13 @@ protected:
   
   /** Generate Data */
   void GenerateData( void );
+
+  double ComputeObjectVolumeInCube(InputImageType::PointType position, InputImageType::SpacingType spacing);
+
+  // Function to determine if the given region is completely inside (INSIDE_YES),
+  // partially inside (INSIDE_PARTIAL), or completely outside (INSIDE_NO).
+  virtual int IsInsideObject(position, spacing);
+
 
 private:
   RenderSpatialObjectImageFilter(const Self&); //purposely not implemented

@@ -74,15 +74,17 @@ RenderSpatialObjectImageFilter< TInput, TOutput >
   it.GoToBegin();
 
   // TODO: Get voxel size
-  VectorType voxSize;
-  //voxSize[0] =
-  //voxSize[1] =
-  //voxSize[2] =
+  InputImageType::SpacingType spacing;
+  double voxelVolume;
+
+  spacing = input->GetSPacing();
+  voxelVolume = static_cast<double>(spacing[0]) * static_cast<double>(spacing[0]) * static_cast<double>(spacing[0]);
 
   while (!it.IsAtEnd())
     {
     InputPixelType pix = it.Get();
     typename InputImageType::IndexType index = it.GetIndex();
+
 
     if (pix == this->m_Label)
       {
@@ -90,7 +92,8 @@ RenderSpatialObjectImageFilter< TInput, TOutput >
       typename InputImageType::PointType point;
       input->TransformIndexToPhysicalPoint (index, point);
 
-      double value = this->ComputeObjectVolumeInCube(point, voxsize);
+      double partialVolume = this->ComputeObjectVolumeInCube(point, spacing);
+      double percentage = partialVolume / voxelVolume;
 
       // TODO: How is the input image incorporated?
       oit.Set( static_cast<OutputPixelType>(value+it.Get()) );
@@ -99,6 +102,7 @@ RenderSpatialObjectImageFilter< TInput, TOutput >
     ++oit;
     }
 }
+
 
 template < typename  TInput, typename TOutput  >
 void
@@ -110,14 +114,63 @@ RenderSpatialObjectImageFilter< TInput, TOutput >
 
 
 template < typename  TInput, typename TOutput  >
-void
+double
 RenderSpatialObjectImageFilter< TInput, TOutput >
-::ComputeObjectVolumeInCube(InputImageType::IndexType index, double voxelSize) const
+::ComputeObjectVolumeInCube(InputImageType::PointType position, InputImageType::SpacingType spacing)
 {
-  
+
+  double volume;
+  volume = static_cast<double>(spacing[0]) * static_cast<double>(spacing[0]) * static_cast<double>(spacing[0]);
+
+  // Is the voxel is completely inside the object?
+  int fInside = this->IsInsideObject(position, spacing);
+  if (fInside == INSIDE_YES)
+    {
+    return volume;
+    }
+  else if (fInside == INSIDE_PARTIAL)
+    {
+    // Check if the divided voxel is still larger than the tolerance volume.
+    if (volume < toleranceVolume)
+      {
+      return volume;
+      }
+    else
+      {
+      // Divide the volume along the longest dimension and call this function recursively.
+      InputImageType::IndexType index = this->FindLongestVoxelDimension(spacing);
+      InputImageType::PointType subvoxelPosition = position;
+      InputImageType::SpacingType subvoxelSpacing = spacing;
+
+      subvoxelSpacing[index] = spacing[index] / 2.0;
+
+      subvoxelPosition[index] = position[index] - subvoxelSpacing[index];
+      double volume1 = this->ComputeObjectVolumeInCube(subvoxelPosition, subvoxelSpacing);
+
+      subvoxelPosition[index] = position[index] + subvoxelSpacing[index];
+      double volume2 = this->ComputeObjectVolumeInCube(subvoxelPosition, subvoxelSpacing);
+
+      return (volume1 + volume2);
+
+      }
+    }
+  else // fInside == INSIDE_NO
+    {
+    // Divide the volume in the longest dimension
+    return 0.0;
+    }
+
 }
 
 
+template < typename  TInput, typename TOutput  >
+int
+RenderSpatialObjectImageFilter< TInput, TOutput >
+::IsInsideObject(position, spacing)
+{
+}
+
+  
 } // end namespace itk
   
 #endif
