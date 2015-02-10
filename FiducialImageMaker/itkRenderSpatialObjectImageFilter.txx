@@ -87,7 +87,8 @@ RenderSpatialObjectImageFilter< TInput, TOutput >
 
   std::vector< VectorType > vertices;
   vertices.resize(8);
-  
+
+  VectorType pointVector;
   while (!it.IsAtEnd())
     {
     InputPixelType pix = it.Get();
@@ -115,21 +116,23 @@ RenderSpatialObjectImageFilter< TInput, TOutput >
     
     typename InputImageType::SpacingType hsp;
     hsp = spacing/2.0;
-    
-    vertices[0] = point.GetVectorFromOrigin() - hsp;
-    vertices[6] = point.GetVectorFromOrigin() + hsp;
+
+    pointVector = point.GetVectorFromOrigin();
+
+    vertices[0] = pointVector - hsp;
+    vertices[6] = pointVector + hsp;
     
     hsp[0] = -hsp[0]; // (-1, 1, 1)
-    vertices[1] = point.GetVectorFromOrigin() - hsp;
-    vertices[7] = point.GetVectorFromOrigin() + hsp;
+    vertices[1] = pointVector - hsp;
+    vertices[7] = pointVector + hsp;
     
     hsp[1] = -hsp[1]; // (-1, -1, 1)
-    vertices[2] = point.GetVectorFromOrigin() - hsp;
-    vertices[4] = point.GetVectorFromOrigin() + hsp;
+    vertices[2] = pointVector - hsp;
+    vertices[4] = pointVector + hsp;
     
     hsp[0] = -hsp[0]; // (1, -1, 1)
-    vertices[3] = point.GetVectorFromOrigin() - hsp;
-    vertices[5] = point.GetVectorFromOrigin() + hsp;
+    vertices[3] = pointVector - hsp;
+    vertices[5] = pointVector + hsp;
     
     double partialVolume = this->ComputeObjectVolumeInCube(vertices);
     double percentage = partialVolume / voxelVolume;
@@ -141,10 +144,10 @@ RenderSpatialObjectImageFilter< TInput, TOutput >
     ++it;
     ++oit;
     
-    if (percentage > 0.50)
-      {
-      std::cerr << "percentage = " << percentage << std::endl;
-      }
+    //if (percentage > 0.50)
+    //  {
+    //  std::cerr << "percentage = " << percentage << std::endl;
+    //  }
     }
     
   vertices.clear();
