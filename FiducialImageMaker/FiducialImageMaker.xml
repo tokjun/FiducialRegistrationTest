@@ -13,24 +13,47 @@
     <description><![CDATA[Input/output parameters]]></description>
     <image>
       <name>inputVolume</name>
-      <label>Input Volume</label>
+      <label>Source Volume</label>
       <channel>input</channel>
       <index>0</index>
       <description><![CDATA[Volume to use as a background.]]></description>
     </image>
-    <geometry>
-      <name>inputModel</name>
-      <label>Input Model</label>
-      <channel>input</channel>
-      <index>1</index>
-      <description><![CDATA[Fiducial model]]></description>
-    </geometry>
+    <point multiple="true" coordinateSystem="ras">
+      <name>marker</name>
+      <label>Markers</label>
+      <longflag>--marker</longflag>
+      <description><![CDATA[Spherical marker positions]]></description>
+      <default>0,0,0</default>
+    </point>
     <image>
       <name>outputVolume</name>
       <label>Output Volume</label>
       <channel>output</channel>
-      <index>2</index>
+      <index>1</index>
       <description><![CDATA[Output volume with fiducials.]]></description>
     </image>
   </parameters>
+  
+  <parameters>
+    <label>Parameters</label>
+    <description>Parameters for Otsu Thresholding</description>
+    <double>
+      <name>radius</name>
+      <longflag>radius</longflag>
+      <flag>r</flag>
+      <label>Radius</label>
+      <description>Radius of fiducial markers</description>
+      <default>10.0</default>
+    </double>
+    <double>
+      <name>defaultVoxelValue</name>
+      <longflag>defaultVoxelValue</longflag>
+      <flag>v</flag>
+      <label>defaultVoxelValue</label>
+      <description>Default voxel value of fiducial markers</description>
+      <default>10.0</default>
+    </double>
+
+  </parameters>
+
 </executable>

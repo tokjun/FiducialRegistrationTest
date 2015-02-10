@@ -1,12 +1,11 @@
 /*=========================================================================
 
-  Program:   LineMarkerRegistration CLI for 3D Slicer
+  Program:   Fiducial Image Maker CLI for 3D Slicer
   Module:    itkRenderSpatialObjectImageFilter.h
   Language:  C++
   Contributor: Junichi Tokuda (BWH)
 
-  This code is based on vtkImageToImageFilter.h in ITK.
-
+  Copyright (c) Brigham and Women's Hosptial All. rights reserved.
   Copyright (c) Insight Software Consortium. All rights reserved.
   See ITKCopyright.txt or http://www.itk.org/HTML/Copyright.htm for details.
 
@@ -94,7 +93,7 @@ public:
 
 protected:
   RenderSpatialObjectImageFilter();
-  ~RenderSpatialObjectImageFilter() {};
+  ~RenderSpatialObjectImageFilter();
   void PrintSelf(std::ostream& os, Indent indent) const;
   
   /** Generate Data */

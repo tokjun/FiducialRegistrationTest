@@ -1,3 +1,20 @@
+/*=========================================================================
+
+  Program:   Fiducial Image Maker CLI for 3D Slicer
+  Module:    itkRenderSpatialObjectImageFilter.h
+  Language:  C++
+  Contributor: Junichi Tokuda (BWH)
+
+  Copyright (c) Brigham and Women's Hosptial. All rights reserved.
+  Copyright (c) Insight Software Consortium. All rights reserved.
+  See ITKCopyright.txt or http://www.itk.org/HTML/Copyright.htm for details.
+
+     This software is distributed WITHOUT ANY WARRANTY; without even 
+     the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR 
+     PURPOSE.  See the above copyright notices for more information.
+
+=========================================================================*/
+
 #include "itkImageFileWriter.h"
 #include "itkImageFileReader.h"
 
@@ -43,6 +60,19 @@ int DoIt( int argc, char * argv[], T )
 
   typename FilterType::Pointer filter = FilterType::New();
   filter->SetInput( reader->GetOutput() );
+  int n = marker.size();
+  for (int i = 0; i < n; i ++)
+    {
+    double lps[3];
+    lps[0] = -marker[i][0];
+    lps[1] = -marker[i][1];
+    lps[2] = marker[i][2];
+    filter->AddFiducialCenter(lps);
+    }
+  
+  filter->SetFiducialRadius(radius);
+  
+  filter->SetDefaultVoxelValue(defaultVoxelValue);
 
   typename WriterType::Pointer writer = WriterType::New();
   writer->SetFileName( outputVolume.c_str() );

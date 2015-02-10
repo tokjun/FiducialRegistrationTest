@@ -1,6 +1,6 @@
 /*=========================================================================
 
-  Program:   LineMarkerRegistration CLI for 3D Slicer
+  Program:   Fiducial Image Maker CLI for 3D Slicer
   Module:    itkRenderSpatialObjectImageFilter.h
   Language:  C++
   Contributor: Junichi Tokuda (BWH)
@@ -38,12 +38,18 @@ template < typename  TInput, typename TOutput  >
 RenderSpatialObjectImageFilter< TInput, TOutput >
 ::RenderSpatialObjectImageFilter()
 {
+  this->m_FiducialCenterList.clear();
   this->m_FiducialRadius = 10;
   this->m_DefaultVoxelValue = 100;
   this->m_ToleranceVolume = 0.01;
 }
 
-
+template < typename  TInput, typename TOutput  >
+RenderSpatialObjectImageFilter< TInput, TOutput >
+::~RenderSpatialObjectImageFilter()
+{
+}
+  
 template < typename  TInput, typename TOutput  >
 void 
 RenderSpatialObjectImageFilter< TInput, TOutput >
@@ -75,8 +81,13 @@ RenderSpatialObjectImageFilter< TInput, TOutput >
   double voxelVolume;
 
   spacing = input->GetSpacing();
-  voxelVolume = static_cast<double>(spacing[0]) * static_cast<double>(spacing[0]) * static_cast<double>(spacing[0]);
+  voxelVolume = static_cast<double>(spacing[0]) * static_cast<double>(spacing[1]) * static_cast<double>(spacing[2]);
 
+  int i = 0;
+
+  std::vector< VectorType > vertices;
+  vertices.resize(8);
+  
   while (!it.IsAtEnd())
     {
     InputPixelType pix = it.Get();
@@ -84,9 +95,6 @@ RenderSpatialObjectImageFilter< TInput, TOutput >
 
     typename InputImageType::PointType point;
     input->TransformIndexToPhysicalPoint (index, point);
-    
-    std::vector< VectorType > vertices;
-    vertices.resize(6);
     
     // Calculate 6 vertex
     //     
@@ -127,11 +135,21 @@ RenderSpatialObjectImageFilter< TInput, TOutput >
     double percentage = partialVolume / voxelVolume;
    
     // TODO: How is the input image incorporated?
-    oit.Set( static_cast<OutputPixelType>(this->m_DefaultVoxelValue*percentage+it.Get()) );
+    //oit.Set( static_cast<OutputPixelType>(this->m_DefaultVoxelValue*percentage+it.Get()) );
+    oit.Set( static_cast<OutputPixelType>(this->m_DefaultVoxelValue*percentage) );
 
     ++it;
     ++oit;
+    
+    if (percentage > 0.50)
+      {
+      std::cerr << "percentage = " << percentage << std::endl;
+      }
     }
+    
+  vertices.clear();
+  std::cerr << "End of loop." << std::endl;
+  
 }
 
 
@@ -151,7 +169,7 @@ RenderSpatialObjectImageFilter< TInput, TOutput >
 {
 
   double volume;
-  if (vertices.size() != 6)
+  if (vertices.size() != 8)
     {
     return 0.0;
     }
@@ -160,6 +178,7 @@ RenderSpatialObjectImageFilter< TInput, TOutput >
   spacing[0] = vertices[1][0]-vertices[0][0];
   spacing[1] = vertices[3][1]-vertices[0][1];
   spacing[2] = vertices[4][2]-vertices[0][2];
+  //std::cerr << "spacing: (" << spacing[0] <<  ", " << spacing[1] << ", " << spacing[2] << ")" << std::endl;
 
   // Assume the volume defined by vertices is a cube
   volume = static_cast<double>(spacing[0]) * static_cast<double>(spacing[1]) * static_cast<double>(spacing[2]);
@@ -186,7 +205,7 @@ RenderSpatialObjectImageFilter< TInput, TOutput >
       for (int i = 1; i < 3; i ++) index = (spacing[i] > spacing[index])? i : index;
       
       std::vector< VectorType > subvolumeVertices;
-      subvolumeVertices.resize(6);
+      subvolumeVertices.resize(8);
 
       int p0, p1, p2, p3, p4, p5, p6, p7;
       if (index == 0)
@@ -200,7 +219,7 @@ RenderSpatialObjectImageFilter< TInput, TOutput >
         p6 = 6;
         p7 = 5;
         }
-      else if (index == 2)
+      else if (index == 1)
         {
         p0 = 0;
         p1 = 1;
@@ -230,8 +249,8 @@ RenderSpatialObjectImageFilter< TInput, TOutput >
       
       subvolumeVertices[p4] = (vertices[p0] + vertices[p4]) / 2.0;
       subvolumeVertices[p5] = (vertices[p1] + vertices[p5]) / 2.0;
-      subvolumeVertices[p6] = (vertices[p5] + vertices[p6]) / 2.0;
-      subvolumeVertices[p7] = (vertices[p4] + vertices[p7]) / 2.0;
+      subvolumeVertices[p6] = (vertices[p2] + vertices[p6]) / 2.0;
+      subvolumeVertices[p7] = (vertices[p3] + vertices[p7]) / 2.0;
       
       double volume1 = this->ComputeObjectVolumeInCube(subvolumeVertices);
       
@@ -267,7 +286,7 @@ RenderSpatialObjectImageFilter< TInput, TOutput >
 {
 
   typename std::vector< typename InputImageType::PointType >::iterator fiter;
-  
+
   // First, simply check if there is any vertex inside any spherical fiducial
   for (fiter = this->m_FiducialCenterList.begin(); fiter != this->m_FiducialCenterList.end(); fiter ++)
     {
