@@ -99,11 +99,13 @@ protected:
   /** Generate Data */
   void GenerateData( void );
 
-  double ComputeObjectVolumeInCube(std::vector< VectorType >& vertices);
+  //double ComputeObjectVolumeInCube(std::vector< VectorType >& vertices);
+  double ComputeObjectVolumeInCube(VectorType& position, VectorType& spacing);
 
   // Function to determine if the given region is completely inside (INSIDE_YES),
   // partially inside (INSIDE_PARTIAL), or completely outside (INSIDE_NO).
-  virtual int IsInsideObject(std::vector< VectorType >& vertices);
+  //virtual int IsInsideObject(std::vector< VectorType >& vertices);
+  virtual int IsInsideObject(VectorType& position, VectorType& spacing);
 
 
 private:
