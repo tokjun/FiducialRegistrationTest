@@ -103,12 +103,19 @@ protected:
   void ComputeVerticesOfCubicRegion(typename InputImageType::PointType& center,
                                     std::vector< VectorType >& vertices);
 
-  double ComputeObjectVolumeInCube(std::vector< VectorType >& vertices, typename InputImageType::SpacingType& spacing);
+  // Compute the volume of the object in the specified cube.
+  // 'objectID' may be specified, if only one object is used.
+  // (All object will be used when objectID < 0)
+  double ComputeObjectVolumeInCube(std::vector< VectorType >& vertices,
+                                   typename InputImageType::SpacingType& spacing,
+                                   int objectID=-1);
 
   // Function to determine if the given region is completely inside (INSIDE_YES),
   // partially inside (INSIDE_PARTIAL), or completely outside (INSIDE_NO).
-  virtual int IsInsideObject(std::vector< VectorType >& vertices);
-
+  // 'objectID' may be specified, if only one object is used.
+  // (All object will be used when objectID < 0)
+  virtual int IsInsideObject(std::vector< VectorType >& vertice,
+                             int objectID=-1);
 
 private:
   RenderSpatialObjectImageFilter(const Self&); //purposely not implemented

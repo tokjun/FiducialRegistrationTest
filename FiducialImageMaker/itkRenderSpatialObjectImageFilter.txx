@@ -94,7 +94,7 @@ RenderSpatialObjectImageFilter< TInput, TOutput >
   regionSize[2] = octantRegionSize[2]*2;
      
   //// Define regions based on the locations of the markers
-  int fidID = 1;
+  int fidID = 0;
   int nFiducials = this->m_FiducialCenterList.size();
 
   for (fiter = this->m_FiducialCenterList.begin(); fiter != this->m_FiducialCenterList.end(); fiter ++)
@@ -130,7 +130,7 @@ RenderSpatialObjectImageFilter< TInput, TOutput >
 
     voxelVolume = static_cast<double>(spacing[0]) * static_cast<double>(spacing[1]) * static_cast<double>(spacing[2]);
 
-    std::cerr << "Rendering fiducial #" << fidID << "/" << nFiducials << "..." << std::endl;
+    std::cerr << "Rendering fiducial #" << (fidID+1) << "/" << nFiducials << "..." << std::endl;
 
     while (!it.IsAtEnd())
       {
@@ -147,7 +147,7 @@ RenderSpatialObjectImageFilter< TInput, TOutput >
       
       // TODO: How is the input image incorporated?
       //oit.Set( static_cast<OutputPixelType>(this->m_DefaultVoxelValue*percentage+it.Get()) );
-      oit.Set( static_cast<OutputPixelType>(this->m_DefaultVoxelValue*percentage) );
+      oit.Set( static_cast<OutputPixelType>(this->m_DefaultVoxelValue*percentage+oit.Get()) );
       
       ++it;
       ++oit;
@@ -237,7 +237,9 @@ RenderSpatialObjectImageFilter< TInput, TOutput >
 template < typename  TInput, typename TOutput  >
 double
 RenderSpatialObjectImageFilter< TInput, TOutput >
-::ComputeObjectVolumeInCube(std::vector< VectorType >& vertices, typename InputImageType::SpacingType& spacing)
+::ComputeObjectVolumeInCube(std::vector< VectorType >& vertices,
+                            typename InputImageType::SpacingType& spacing,
+                            int objectID)
 {
 
   double volume;
@@ -250,7 +252,7 @@ RenderSpatialObjectImageFilter< TInput, TOutput >
   volume = static_cast<double>(spacing[0]) * static_cast<double>(spacing[1]) * static_cast<double>(spacing[2]);
 
   // Is the voxel is completely inside the object?
-  int fInside = this->IsInsideObject(vertices);
+  int fInside = this->IsInsideObject(vertices, objectID);
   if (fInside == INSIDE_YES)
     {
     return volume;
@@ -352,14 +354,22 @@ RenderSpatialObjectImageFilter< TInput, TOutput >
 template < typename  TInput, typename TOutput  >
 int
 RenderSpatialObjectImageFilter< TInput, TOutput >
-::IsInsideObject(std::vector< VectorType >& vertices)
+::IsInsideObject(std::vector< VectorType >& vertices,
+                 int objectID)
 {
 
   typename std::vector< typename InputImageType::PointType >::iterator fiter;
 
+  int id = 0;
   // First, simply check if there is any vertex inside any spherical fiducial
   for (fiter = this->m_FiducialCenterList.begin(); fiter != this->m_FiducialCenterList.end(); fiter ++)
     {
+    if (objectID > 0 && objectID != id)
+      {
+      id ++;
+      continue;
+      }
+
     int count = 0;
     typename std::vector< VectorType >::iterator viter;
     for (viter = vertices.begin(); viter != vertices.end(); viter ++)
@@ -378,6 +388,7 @@ RenderSpatialObjectImageFilter< TInput, TOutput >
       {
       return INSIDE_PARTIAL;
       }
+    id ++;
     }
 
   // If there is no vertex inside any spherical fiducial, check if there is any face of the cube that intersect the sphere.
@@ -391,8 +402,15 @@ RenderSpatialObjectImageFilter< TInput, TOutput >
     {1, 2, 6, 5},
   };
 
+  id = 0;
   for (fiter = this->m_FiducialCenterList.begin(); fiter != this->m_FiducialCenterList.end(); fiter ++)
     {
+    if (objectID > 0 && objectID != id)
+      {
+      id ++;
+      continue;
+      }
+
     for (int i = 0; i < 6; i ++)
       {
       VectorType& origin = vertices[faces[i][0]];
@@ -431,6 +449,7 @@ RenderSpatialObjectImageFilter< TInput, TOutput >
           }
         }
       }
+    id ++;
     }
 
   return INSIDE_NO;
