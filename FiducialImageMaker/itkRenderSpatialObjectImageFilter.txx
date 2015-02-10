@@ -67,91 +67,96 @@ RenderSpatialObjectImageFilter< TInput, TOutput >
 
   typename std::vector< typename InputImageType::PointType >::iterator fiter;
 
-
-  //// Define regions based on the locations of the markers
-  //for (fiter = this->m_FiducialCenterList.begin(); fiter != this->m_FiducialCenterList.end(); fiter ++)
-  //{
-
   ImageRegionConstIterator<InputImageType> it;    
   ImageRegionIterator<OutputImageType> oit;
-
-  it = ImageRegionConstIterator<InputImageType>(input, input->GetRequestedRegion());
-  oit = ImageRegionIterator<OutputImageType>(output, output->GetRequestedRegion());
-  
-  oit.GoToBegin();
-  it.GoToBegin();
-  
-  // TODO: Get voxel size
-  typename InputImageType::SpacingType spacing;
-  double voxelVolume;
-
-  spacing = input->GetSpacing();
-  voxelVolume = static_cast<double>(spacing[0]) * static_cast<double>(spacing[1]) * static_cast<double>(spacing[2]);
 
   std::vector< VectorType > vertices;
   vertices.resize(8);
 
-  //// Get the vectors along the indices
-  //typename InputImageType::DirectionType direction = input->GetDirection();
-  //VectorType iVec;
-  //VectorType jVec;
-  //VectorType kVec;
-  //
-  //for (int i = 0; i < 3; i ++)
-  //  {
-  //  iVec[i] = direction[0][i] * spacing[0]/2.0;
-  //  jVec[i] = direction[1][i] * spacing[1]/2.0;
-  //  kVec[i] = direction[2][i] * spacing[2]/2.0;
-  //  }
-  //
-  //VectorType ijVecPlus  = iVec + jVec;
-  //VectorType ijVecMinus = iVec - jVec;
+  // Region size per fiducial (1.2 times larger than the actual fiducial size)
+  double octantFiducialSize[3];
+  octantFiducialSize[0] = this->m_FiducialRadius * 1.2;
+  octantFiducialSize[1] = this->m_FiducialRadius * 1.2;
+  octantFiducialSize[2] = this->m_FiducialRadius * 1.2;
 
-  this->SetupForVertexComputation(input, spacing);
+  typename InputImageType::SpacingType spacing;
+  spacing = input->GetSpacing();
 
-  std::cerr << "Starting the loop" <<  std::endl;
+  // Calculate the size of the region in voxels
+  typename InputImageType::RegionType::SizeType octantRegionSize;
+  octantRegionSize[0] = static_cast<int>(octantFiducialSize[0] / spacing[0]) + 1;
+  octantRegionSize[1] = static_cast<int>(octantFiducialSize[1] / spacing[1]) + 1;
+  octantRegionSize[2] = static_cast<int>(octantFiducialSize[2] / spacing[2]) + 1;
 
-  while (!it.IsAtEnd())
+  typename InputImageType::RegionType::SizeType regionSize;
+  regionSize[0] = octantRegionSize[0]*2;
+  regionSize[1] = octantRegionSize[1]*2;
+  regionSize[2] = octantRegionSize[2]*2;
+     
+  //// Define regions based on the locations of the markers
+  int fidID = 1;
+  int nFiducials = this->m_FiducialCenterList.size();
+
+  for (fiter = this->m_FiducialCenterList.begin(); fiter != this->m_FiducialCenterList.end(); fiter ++)
     {
-    InputPixelType pix = it.Get();
-    typename InputImageType::IndexType index = it.GetIndex();
+    // Calculate the region
+    // Pixel index for the center of the fiduial
+    typename InputImageType::IndexType regionIndex;
+    typename InputImageType::IndexType centerIndex;
+    input->TransformPhysicalPointToIndex(*fiter, centerIndex);
 
-    typename InputImageType::PointType point;
-    input->TransformIndexToPhysicalPoint (index, point);
+    int i;
+    regionIndex[0] = ((i = centerIndex[0] - octantRegionSize[0]) > 0)? i : 0;
+    regionIndex[1] = ((i = centerIndex[1] - octantRegionSize[1]) > 0)? i : 0;
+    regionIndex[2] = ((i = centerIndex[2] - octantRegionSize[2]) > 0)? i : 0;
 
-    //VectorType pointVec = point.GetVectorFromOrigin();
-    //VectorType pointVecKMinus  = pointVec - kVec;
-    //VectorType pointVecKPlus   = pointVec + kVec;
-    //
-    //vertices[0] = pointVecKMinus - ijVecPlus;
-    //vertices[1] = pointVecKMinus + ijVecMinus;
-    //vertices[2] = pointVecKMinus + ijVecPlus;
-    //vertices[3] = pointVecKMinus - ijVecMinus;
-    //vertices[4] = pointVecKPlus - ijVecPlus;
-    //vertices[5] = pointVecKPlus + ijVecMinus;
-    //vertices[6] = pointVecKPlus + ijVecPlus;
-    //vertices[7] = pointVecKPlus - ijVecMinus;
+    typename InputImageType::RegionType inputRegion;
+    typename OutputImageType::RegionType outputRegion;
 
-    this->ComputeVerticesOfCubicRegion(point, spacing, vertices);
+    inputRegion.SetIndex(regionIndex);
+    inputRegion.SetSize(regionSize);
+    outputRegion.SetIndex(regionIndex);
+    outputRegion.SetSize(regionSize);
     
-    double partialVolume = this->ComputeObjectVolumeInCube(vertices, spacing);
-    double percentage = partialVolume / voxelVolume;
-   
-    // TODO: How is the input image incorporated?
-    //oit.Set( static_cast<OutputPixelType>(this->m_DefaultVoxelValue*percentage+it.Get()) );
-    oit.Set( static_cast<OutputPixelType>(this->m_DefaultVoxelValue*percentage) );
+    it = ImageRegionConstIterator<InputImageType>(input, inputRegion);
+    oit = ImageRegionIterator<OutputImageType>(output, outputRegion);
 
-    ++it;
-    ++oit;
-    
-    if (percentage > 0.50)
+    oit.GoToBegin();
+    it.GoToBegin();
+  
+    this->SetupForVertexComputation(input, spacing);
+
+    double voxelVolume;
+
+    voxelVolume = static_cast<double>(spacing[0]) * static_cast<double>(spacing[1]) * static_cast<double>(spacing[2]);
+
+    std::cerr << "Rendering fiducial #" << fidID << "/" << nFiducials << "..." << std::endl;
+
+    while (!it.IsAtEnd())
       {
-      std::cerr << "percentage = " << percentage << std::endl;
+      InputPixelType pix = it.Get();
+      typename InputImageType::IndexType index = it.GetIndex();
+      
+      typename InputImageType::PointType point;
+      input->TransformIndexToPhysicalPoint (index, point);
+      
+      this->ComputeVerticesOfCubicRegion(point, vertices);
+      
+      double partialVolume = this->ComputeObjectVolumeInCube(vertices, spacing);
+      double percentage = partialVolume / voxelVolume;
+      
+      // TODO: How is the input image incorporated?
+      //oit.Set( static_cast<OutputPixelType>(this->m_DefaultVoxelValue*percentage+it.Get()) );
+      oit.Set( static_cast<OutputPixelType>(this->m_DefaultVoxelValue*percentage) );
+      
+      ++it;
+      ++oit;
+
       }
+    fidID ++;
     }
     
   vertices.clear();
-  std::cerr << "End of loop." << std::endl;
   
 }
 
@@ -211,7 +216,6 @@ template < typename  TInput, typename TOutput  >
 void 
 RenderSpatialObjectImageFilter< TInput, TOutput >
 ::ComputeVerticesOfCubicRegion(typename InputImageType::PointType& center,
-                               typename InputImageType::SpacingType& spacing,
                                std::vector< VectorType >& vertices)
 {
 

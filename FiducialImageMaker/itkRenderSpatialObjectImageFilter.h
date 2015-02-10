@@ -101,7 +101,6 @@ protected:
 
   void SetupForVertexComputation(typename InputImageType::ConstPointer& input, typename InputImageType::SpacingType& spacing);
   void ComputeVerticesOfCubicRegion(typename InputImageType::PointType& center,
-                                    typename InputImageType::SpacingType& spacing,
                                     std::vector< VectorType >& vertices);
 
   double ComputeObjectVolumeInCube(std::vector< VectorType >& vertices, typename InputImageType::SpacingType& spacing);
