@@ -99,6 +99,11 @@ protected:
   /** Generate Data */
   void GenerateData( void );
 
+  void SetupForVertexComputation(typename InputImageType::ConstPointer& input, typename InputImageType::SpacingType& spacing);
+  void ComputeVerticesOfCubicRegion(typename InputImageType::PointType& center,
+                                    typename InputImageType::SpacingType& spacing,
+                                    std::vector< VectorType >& vertices);
+
   double ComputeObjectVolumeInCube(std::vector< VectorType >& vertices, typename InputImageType::SpacingType& spacing);
 
   // Function to determine if the given region is completely inside (INSIDE_YES),
@@ -115,6 +120,13 @@ private:
 
   double m_DefaultVoxelValue;
   double m_ToleranceVolume;
+
+  // Parameters to calculate vertex
+  VectorType m_iVec;
+  VectorType m_jVec;
+  VectorType m_kVec;
+  VectorType m_ijVecPlus;
+  VectorType m_ijVecMinus;
   
 };
 

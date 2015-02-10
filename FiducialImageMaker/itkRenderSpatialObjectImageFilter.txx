@@ -68,12 +68,14 @@ RenderSpatialObjectImageFilter< TInput, TOutput >
   typename std::vector< typename InputImageType::PointType >::iterator fiter;
 
 
-  // Define regions based on the locations of the markers
+  //// Define regions based on the locations of the markers
   //for (fiter = this->m_FiducialCenterList.begin(); fiter != this->m_FiducialCenterList.end(); fiter ++)
   //{
-  ImageRegionConstIterator<InputImageType> it;
-  it = ImageRegionConstIterator<InputImageType>(input, input->GetRequestedRegion());
+
+  ImageRegionConstIterator<InputImageType> it;    
   ImageRegionIterator<OutputImageType> oit;
+
+  it = ImageRegionConstIterator<InputImageType>(input, input->GetRequestedRegion());
   oit = ImageRegionIterator<OutputImageType>(output, output->GetRequestedRegion());
   
   oit.GoToBegin();
@@ -86,46 +88,26 @@ RenderSpatialObjectImageFilter< TInput, TOutput >
   spacing = input->GetSpacing();
   voxelVolume = static_cast<double>(spacing[0]) * static_cast<double>(spacing[1]) * static_cast<double>(spacing[2]);
 
-  // Indices for the 8 vertex of the given cubic region defined in the index space (i, j, k)
-  // (not physical space (L, P, S))
-  //     
-  //            (v7)----+-----(v6)
-  //            /|     /|     /|
-  //           +------+------+ |
-  //          /| |   /| |   /| |
-  //        (v4)----+-----(v5)-+
-  //         | |/|  | | |  | |/|
-  //         | +----|-O----|-+ |
-  //         |/| |  |/| |  |/| |
-  //         +--(v3)+------+-|(v2)
-  //         | |/   | |/   | |/
-  //  2 1    | +----|-+----|-+
-  //  |/     |/     |/     |/
-  //  +--0  (v0)----+-----(v1)
-  //
-  //  The following vectors are defined:
-  //     <iVec> = (<v1> - <v0>) / 2.0 (vector along i-direction (in the LPS coordinates)
-  //     <jVec> = (<v3> - <v0>) / 2.0 (vector along j-direction (in the LPS coordinates)
-  //     <kVec> = (<v4> - <v0>) / 2.0 (vector along k-direction (in the LPS coordinates)
-
   std::vector< VectorType > vertices;
   vertices.resize(8);
 
-  // Get the vectors along the indices
-  typename InputImageType::DirectionType direction = input->GetDirection();
-  VectorType iVec;
-  VectorType jVec;
-  VectorType kVec;
+  //// Get the vectors along the indices
+  //typename InputImageType::DirectionType direction = input->GetDirection();
+  //VectorType iVec;
+  //VectorType jVec;
+  //VectorType kVec;
+  //
+  //for (int i = 0; i < 3; i ++)
+  //  {
+  //  iVec[i] = direction[0][i] * spacing[0]/2.0;
+  //  jVec[i] = direction[1][i] * spacing[1]/2.0;
+  //  kVec[i] = direction[2][i] * spacing[2]/2.0;
+  //  }
+  //
+  //VectorType ijVecPlus  = iVec + jVec;
+  //VectorType ijVecMinus = iVec - jVec;
 
-  for (int i = 0; i < 3; i ++)
-    {
-    iVec[i] = direction[0][i] * spacing[0]/2.0;
-    jVec[i] = direction[1][i] * spacing[1]/2.0;
-    kVec[i] = direction[2][i] * spacing[2]/2.0;
-    }
-
-  VectorType ijVecPlus  = iVec + jVec;
-  VectorType ijVecMinus = iVec - jVec;
+  this->SetupForVertexComputation(input, spacing);
 
   std::cerr << "Starting the loop" <<  std::endl;
 
@@ -136,19 +118,21 @@ RenderSpatialObjectImageFilter< TInput, TOutput >
 
     typename InputImageType::PointType point;
     input->TransformIndexToPhysicalPoint (index, point);
-    VectorType pointVec = point.GetVectorFromOrigin();
-    
-    VectorType pointVecKMinus  = pointVec - kVec;
-    VectorType pointVecKPlus   = pointVec + kVec;
 
-    vertices[0] = pointVecKMinus - ijVecPlus;
-    vertices[1] = pointVecKMinus + ijVecMinus;
-    vertices[2] = pointVecKMinus + ijVecPlus;
-    vertices[3] = pointVecKMinus - ijVecMinus;
-    vertices[4] = pointVecKPlus - ijVecPlus;
-    vertices[5] = pointVecKPlus + ijVecMinus;
-    vertices[6] = pointVecKPlus + ijVecPlus;
-    vertices[7] = pointVecKPlus - ijVecMinus;
+    //VectorType pointVec = point.GetVectorFromOrigin();
+    //VectorType pointVecKMinus  = pointVec - kVec;
+    //VectorType pointVecKPlus   = pointVec + kVec;
+    //
+    //vertices[0] = pointVecKMinus - ijVecPlus;
+    //vertices[1] = pointVecKMinus + ijVecMinus;
+    //vertices[2] = pointVecKMinus + ijVecPlus;
+    //vertices[3] = pointVecKMinus - ijVecMinus;
+    //vertices[4] = pointVecKPlus - ijVecPlus;
+    //vertices[5] = pointVecKPlus + ijVecMinus;
+    //vertices[6] = pointVecKPlus + ijVecPlus;
+    //vertices[7] = pointVecKPlus - ijVecMinus;
+
+    this->ComputeVerticesOfCubicRegion(point, spacing, vertices);
     
     double partialVolume = this->ComputeObjectVolumeInCube(vertices, spacing);
     double percentage = partialVolume / voxelVolume;
@@ -181,6 +165,71 @@ RenderSpatialObjectImageFilter< TInput, TOutput >
 }
 
 
+// Indices for the 8 vertex of the given cubic region defined in the index space (i, j, k)
+// (not physical space (L, P, S))
+//     
+//            (v7)----+-----(v6)
+//            /|     /|     /|
+//           +------+------+ |
+//          /| |   /| |   /| |
+//        (v4)----+-----(v5)-+
+//         | |/|  | | |  | |/|
+//         | +----|-O----|-+ |
+//         |/| |  |/| |  |/| |
+//         +--(v3)+------+-|(v2)
+//         | |/   | |/   | |/
+//  2 1    | +----|-+----|-+
+//  |/     |/     |/     |/
+//  +--0  (v0)----+-----(v1)
+//
+//  The following vectors are defined:
+//     <iVec> = (<v1> - <v0>) / 2.0 (vector along i-direction (in the LPS coordinates)
+//     <jVec> = (<v3> - <v0>) / 2.0 (vector along j-direction (in the LPS coordinates)
+//     <kVec> = (<v4> - <v0>) / 2.0 (vector along k-direction (in the LPS coordinates)
+
+template < typename  TInput, typename TOutput  >
+void 
+RenderSpatialObjectImageFilter< TInput, TOutput >
+::SetupForVertexComputation(typename InputImageType::ConstPointer& input, typename InputImageType::SpacingType& spacing)
+{
+  // Get the vectors along the indices
+  typename InputImageType::DirectionType direction = input->GetDirection();
+
+  for (int i = 0; i < 3; i ++)
+    {
+    this->m_iVec[i] = direction[0][i] * spacing[0]/2.0;
+    this->m_jVec[i] = direction[1][i] * spacing[1]/2.0;
+    this->m_kVec[i] = direction[2][i] * spacing[2]/2.0;
+    }
+
+  this->m_ijVecPlus  = this->m_iVec + this->m_jVec;
+  this->m_ijVecMinus = this->m_iVec - this->m_jVec;
+}
+
+
+template < typename  TInput, typename TOutput  >
+void 
+RenderSpatialObjectImageFilter< TInput, TOutput >
+::ComputeVerticesOfCubicRegion(typename InputImageType::PointType& center,
+                               typename InputImageType::SpacingType& spacing,
+                               std::vector< VectorType >& vertices)
+{
+
+  VectorType pointVec = center.GetVectorFromOrigin();
+  VectorType pointVecKMinus  = pointVec - this->m_kVec;
+  VectorType pointVecKPlus   = pointVec + this->m_kVec;
+  
+  vertices[0] = pointVecKMinus - this->m_ijVecPlus;
+  vertices[1] = pointVecKMinus + this->m_ijVecMinus;
+  vertices[2] = pointVecKMinus + this->m_ijVecPlus;
+  vertices[3] = pointVecKMinus - this->m_ijVecMinus;
+  vertices[4] = pointVecKPlus - this->m_ijVecPlus;
+  vertices[5] = pointVecKPlus + this->m_ijVecMinus;
+  vertices[6] = pointVecKPlus + this->m_ijVecPlus;
+  vertices[7] = pointVecKPlus - this->m_ijVecMinus;
+}
+
+ 
 template < typename  TInput, typename TOutput  >
 double
 RenderSpatialObjectImageFilter< TInput, TOutput >
