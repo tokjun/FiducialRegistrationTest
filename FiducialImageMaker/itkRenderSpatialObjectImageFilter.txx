@@ -73,11 +73,11 @@ RenderSpatialObjectImageFilter< TInput, TOutput >
   std::vector< VectorType > vertices;
   vertices.resize(8);
 
-  // Region size per fiducial (1.2 times larger than the actual fiducial size)
+  // Region size per fiducial (1.1 times larger than the actual fiducial size)
   double octantFiducialSize[3];
-  octantFiducialSize[0] = this->m_FiducialRadius * 1.2;
-  octantFiducialSize[1] = this->m_FiducialRadius * 1.2;
-  octantFiducialSize[2] = this->m_FiducialRadius * 1.2;
+  octantFiducialSize[0] = this->m_FiducialRadius * 1.1;
+  octantFiducialSize[1] = this->m_FiducialRadius * 1.1;
+  octantFiducialSize[2] = this->m_FiducialRadius * 1.1;
 
   typename InputImageType::SpacingType spacing;
   spacing = input->GetSpacing();

@@ -49,11 +49,18 @@
       <name>defaultVoxelValue</name>
       <longflag>defaultVoxelValue</longflag>
       <flag>v</flag>
-      <label>defaultVoxelValue</label>
+      <label>Default Voxel Value</label>
       <description>Default voxel value of fiducial markers</description>
-      <default>10.0</default>
+      <default>100.0</default>
     </double>
-
+    <double>
+      <name>toleranceVolume</name>
+      <longflag>toleranceVolume</longflag>
+      <flag>t</flag>
+      <label>Tolerance Volume</label>
+      <description>Tolerance volume size when to stop iteration. (Affects the precision of partial volume effect computation. Value smaller than [voxel volume] / [intensity resolution] is recommended.)</description>
+      <default>0.01</default>
+    </double>
   </parameters>
 
 </executable>

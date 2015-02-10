@@ -71,8 +71,8 @@ int DoIt( int argc, char * argv[], T )
     }
   
   filter->SetFiducialRadius(radius);
-  
   filter->SetDefaultVoxelValue(defaultVoxelValue);
+  filter->SetToleranceVolume(toleranceVolume);
 
   typename WriterType::Pointer writer = WriterType::New();
   writer->SetFileName( outputVolume.c_str() );
