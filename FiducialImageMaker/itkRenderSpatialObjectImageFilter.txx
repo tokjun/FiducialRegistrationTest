@@ -69,16 +69,16 @@ RenderSpatialObjectImageFilter< TInput, TOutput >
 
 
   // Define regions based on the locations of the markers
-  for (fiter = this->m_FiducialCenterList.begin(); fiter != this->m_FiducialCenterList.end(); fiter ++)
-    {
-    ImageRegionConstIterator<InputImageType> it;
-    it = ImageRegionConstIterator<InputImageType>(input, input->GetRequestedRegion());
-    ImageRegionIterator<OutputImageType> oit;
-    oit = ImageRegionIterator<OutputImageType>(output, output->GetRequestedRegion());
-
-    oit.GoToBegin();
-    it.GoToBegin();
-
+  //for (fiter = this->m_FiducialCenterList.begin(); fiter != this->m_FiducialCenterList.end(); fiter ++)
+  //{
+  ImageRegionConstIterator<InputImageType> it;
+  it = ImageRegionConstIterator<InputImageType>(input, input->GetRequestedRegion());
+  ImageRegionIterator<OutputImageType> oit;
+  oit = ImageRegionIterator<OutputImageType>(output, output->GetRequestedRegion());
+  
+  oit.GoToBegin();
+  it.GoToBegin();
+  
   // TODO: Get voxel size
   typename InputImageType::SpacingType spacing;
   double voxelVolume;
