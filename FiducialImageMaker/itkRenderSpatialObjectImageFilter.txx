@@ -60,21 +60,24 @@ RenderSpatialObjectImageFilter< TInput, TOutput >
   typename InputImageType::ConstPointer input = this->GetInput();
   typename OutputImageType::Pointer output = this->GetOutput();
 
-  ImageRegionConstIterator<InputImageType> it;
-  it = ImageRegionConstIterator<InputImageType>( input, input->GetRequestedRegion() );
-  ImageRegionIterator<OutputImageType> oit;
   this->AllocateOutputs();
-  oit = ImageRegionIterator<OutputImageType>(output,
-                                             output->GetRequestedRegion());
 
   // TODO: Should outout image be initialized?
   output->FillBuffer(static_cast<OutputPixelType>(0));
-  
-  typedef itk::Statistics::ListSample< VectorType > PointListType;
-  typedef std::map< InputPixelType, PointListType::Pointer > PointListMapType;
 
-  oit.GoToBegin();
-  it.GoToBegin();
+  typename std::vector< typename InputImageType::PointType >::iterator fiter;
+
+
+  // Define regions based on the locations of the markers
+  for (fiter = this->m_FiducialCenterList.begin(); fiter != this->m_FiducialCenterList.end(); fiter ++)
+    {
+    ImageRegionConstIterator<InputImageType> it;
+    it = ImageRegionConstIterator<InputImageType>(input, input->GetRequestedRegion());
+    ImageRegionIterator<OutputImageType> oit;
+    oit = ImageRegionIterator<OutputImageType>(output, output->GetRequestedRegion());
+
+    oit.GoToBegin();
+    it.GoToBegin();
 
   // TODO: Get voxel size
   typename InputImageType::SpacingType spacing;
@@ -83,11 +86,49 @@ RenderSpatialObjectImageFilter< TInput, TOutput >
   spacing = input->GetSpacing();
   voxelVolume = static_cast<double>(spacing[0]) * static_cast<double>(spacing[1]) * static_cast<double>(spacing[2]);
 
-  int i = 0;
+  // Indices for the 8 vertex of the given cubic region defined in the index space (i, j, k)
+  // (not physical space (L, P, S))
+  //     
+  //            (v7)----+-----(v6)
+  //            /|     /|     /|
+  //           +------+------+ |
+  //          /| |   /| |   /| |
+  //        (v4)----+-----(v5)-+
+  //         | |/|  | | |  | |/|
+  //         | +----|-O----|-+ |
+  //         |/| |  |/| |  |/| |
+  //         +--(v3)+------+-|(v2)
+  //         | |/   | |/   | |/
+  //  2 1    | +----|-+----|-+
+  //  |/     |/     |/     |/
+  //  +--0  (v0)----+-----(v1)
+  //
+  //  The following vectors are defined:
+  //     <iVec> = (<v1> - <v0>) / 2.0 (vector along i-direction (in the LPS coordinates)
+  //     <jVec> = (<v3> - <v0>) / 2.0 (vector along j-direction (in the LPS coordinates)
+  //     <kVec> = (<v4> - <v0>) / 2.0 (vector along k-direction (in the LPS coordinates)
 
   std::vector< VectorType > vertices;
   vertices.resize(8);
-  
+
+  // Get the vectors along the indices
+  typename InputImageType::DirectionType direction = input->GetDirection();
+  VectorType iVec;
+  VectorType jVec;
+  VectorType kVec;
+
+  for (int i = 0; i < 3; i ++)
+    {
+    iVec[i] = direction[0][i] * spacing[0]/2.0;
+    jVec[i] = direction[1][i] * spacing[1]/2.0;
+    kVec[i] = direction[2][i] * spacing[2]/2.0;
+    }
+
+  VectorType ijVecPlus  = iVec + jVec;
+  VectorType ijVecMinus = iVec - jVec;
+
+  std::cerr << "Starting the loop" <<  std::endl;
+
   while (!it.IsAtEnd())
     {
     InputPixelType pix = it.Get();
@@ -95,43 +136,21 @@ RenderSpatialObjectImageFilter< TInput, TOutput >
 
     typename InputImageType::PointType point;
     input->TransformIndexToPhysicalPoint (index, point);
+    VectorType pointVec = point.GetVectorFromOrigin();
     
-    // Calculate 6 vertex
-    //     
-    //            (7)-----+-----(6)
-    //            /|     /|     /|
-    //           +------+------+ |
-    //          /| |   /| |   /| |
-    //        (4)-----+-----(5)|-+
-    //         | |/|  | | |  | |/|
-    //         | +----|-O----|-+ |
-    //         |/| |  |/| |  |/| |
-    //         +--(3)-+------+-|(2)
-    //         | |/   | |/   | |/
-    //  2 1    | +----|-+----|-+
-    //  |/     |/     |/     |/
-    //  +--0  (0)-----+-----(1)
-    //     
+    VectorType pointVecKMinus  = pointVec - kVec;
+    VectorType pointVecKPlus   = pointVec + kVec;
+
+    vertices[0] = pointVecKMinus - ijVecPlus;
+    vertices[1] = pointVecKMinus + ijVecMinus;
+    vertices[2] = pointVecKMinus + ijVecPlus;
+    vertices[3] = pointVecKMinus - ijVecMinus;
+    vertices[4] = pointVecKPlus - ijVecPlus;
+    vertices[5] = pointVecKPlus + ijVecMinus;
+    vertices[6] = pointVecKPlus + ijVecPlus;
+    vertices[7] = pointVecKPlus - ijVecMinus;
     
-    typename InputImageType::SpacingType hsp;
-    hsp = spacing/2.0;
-    
-    vertices[0] = point.GetVectorFromOrigin() - hsp;
-    vertices[6] = point.GetVectorFromOrigin() + hsp;
-    
-    hsp[0] = -hsp[0]; // (-1, 1, 1)
-    vertices[1] = point.GetVectorFromOrigin() - hsp;
-    vertices[7] = point.GetVectorFromOrigin() + hsp;
-    
-    hsp[1] = -hsp[1]; // (-1, -1, 1)
-    vertices[2] = point.GetVectorFromOrigin() - hsp;
-    vertices[4] = point.GetVectorFromOrigin() + hsp;
-    
-    hsp[0] = -hsp[0]; // (1, -1, 1)
-    vertices[3] = point.GetVectorFromOrigin() - hsp;
-    vertices[5] = point.GetVectorFromOrigin() + hsp;
-    
-    double partialVolume = this->ComputeObjectVolumeInCube(vertices);
+    double partialVolume = this->ComputeObjectVolumeInCube(vertices, spacing);
     double percentage = partialVolume / voxelVolume;
    
     // TODO: How is the input image incorporated?
@@ -165,7 +184,7 @@ RenderSpatialObjectImageFilter< TInput, TOutput >
 template < typename  TInput, typename TOutput  >
 double
 RenderSpatialObjectImageFilter< TInput, TOutput >
-::ComputeObjectVolumeInCube(std::vector< VectorType >& vertices)
+::ComputeObjectVolumeInCube(std::vector< VectorType >& vertices, typename InputImageType::SpacingType& spacing)
 {
 
   double volume;
@@ -173,12 +192,6 @@ RenderSpatialObjectImageFilter< TInput, TOutput >
     {
     return 0.0;
     }
-
-  typename InputImageType::SpacingType spacing;
-  spacing[0] = vertices[1][0]-vertices[0][0];
-  spacing[1] = vertices[3][1]-vertices[0][1];
-  spacing[2] = vertices[4][2]-vertices[0][2];
-  //std::cerr << "spacing: (" << spacing[0] <<  ", " << spacing[1] << ", " << spacing[2] << ")" << std::endl;
 
   // Assume the volume defined by vertices is a cube
   volume = static_cast<double>(spacing[0]) * static_cast<double>(spacing[1]) * static_cast<double>(spacing[2]);
@@ -189,6 +202,7 @@ RenderSpatialObjectImageFilter< TInput, TOutput >
     {
     return volume;
     }
+
   else if (fInside == INSIDE_PARTIAL)
     {
     // Check if the divided voxel is still larger than the tolerance volume.
@@ -242,6 +256,9 @@ RenderSpatialObjectImageFilter< TInput, TOutput >
         p7 = 7;
         }
 
+      typename InputImageType::SpacingType subvolumeSpacing = spacing;
+      subvolumeSpacing[index] /= 2.0;
+
       subvolumeVertices[p0] = vertices[p0];
       subvolumeVertices[p1] = vertices[p1];
       subvolumeVertices[p2] = vertices[p2];
@@ -252,7 +269,7 @@ RenderSpatialObjectImageFilter< TInput, TOutput >
       subvolumeVertices[p6] = (vertices[p2] + vertices[p6]) / 2.0;
       subvolumeVertices[p7] = (vertices[p3] + vertices[p7]) / 2.0;
       
-      double volume1 = this->ComputeObjectVolumeInCube(subvolumeVertices);
+      double volume1 = this->ComputeObjectVolumeInCube(subvolumeVertices, subvolumeSpacing);
       
       subvolumeVertices[p0] = subvolumeVertices[p4];
       subvolumeVertices[p1] = subvolumeVertices[p5];
@@ -264,7 +281,7 @@ RenderSpatialObjectImageFilter< TInput, TOutput >
       subvolumeVertices[p6] = vertices[p6];
       subvolumeVertices[p7] = vertices[p7];
       
-      double volume2 = this->ComputeObjectVolumeInCube(subvolumeVertices);
+      double volume2 = this->ComputeObjectVolumeInCube(subvolumeVertices, subvolumeSpacing);
 
       return (volume1 + volume2);
 
