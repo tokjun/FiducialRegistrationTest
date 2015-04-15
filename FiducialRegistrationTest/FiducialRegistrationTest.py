@@ -146,9 +146,6 @@ class FiducialRegistrationTestWidget(ScriptedLoadableModuleWidget):
 
   def onApplyButton(self):
     logic = FiducialRegistrationTestLogic()
-    enableScreenshotsFlag = self.enableScreenshotsFlagCheckBox.checked
-    screenshotScaleFactor = int(self.screenshotScaleFactorSliderWidget.value)
-    print("Run the algorithm")
     logic.run(self.inputSelector.currentNode(), self.outputSelector.currentNode(), enableScreenshotsFlag,screenshotScaleFactor)
 
   def onReload(self, moduleName="FiducialRegistrationTest"):
@@ -162,14 +159,43 @@ class FiducialRegistrationTestWidget(ScriptedLoadableModuleWidget):
 #
 
 class FiducialRegistrationTestLogic(ScriptedLoadableModuleLogic):
-  """This class should implement all the actual
-  computation done by your module.  The interface
-  should be such that other python code can import
-  this class and make use of the functionality without
-  requiring an instance of the Widget.
-  Uses ScriptedLoadableModuleLogic base class, available at:
-  https://github.com/Slicer/Slicer/blob/master/Base/Python/slicer/ScriptedLoadableModule.py
-  """
+
+  def generateRandomTransform(self, xRange, yRange, zRange, matrix):
+    x = random.uniform(xRange[0], xRange[1]) 
+    y = random.uniform(yRange[0], yRange[1]) 
+    z = random.uniform(zRange[0], zRange[1]) 
+    alpha = random.uniform(-math.pi,   math.pi) 
+    beta  = random.uniform(-math.pi/2.0, math.pi/2.0)
+    gamma = random.uniform(-math.pi,   math.pi) 
+
+    s1 = math.sin(alpha)
+    c1 = math.cos(alpha)
+    s2 = math.sin(beta)
+    c2 = math.cos(beta)
+    s3 = math.sin(gamma)
+    c3 = math.cos(gamma)
+
+    # Rotation
+    matrix.SetElement(0, 0, c2)
+    matrix.SetElement(0, 1, -c3*s2)
+    matrix.SetElement(0, 2, s2*s3)
+    matrix.SetElement(1, 0, c1*s2)
+    matrix.SetElement(1, 1, c1*c2*c3-s1*s3)
+    matrix.SetElement(1, 2, -c3*s1-c1*c2*s3)
+    matrix.SetElement(2, 0, s1*s2)
+    matrix.SetElement(2, 1, c1*s3+c2*c3*s1)
+    matrix.SetElement(2, 2, c1*c3-c2*s1*s3)
+
+    # Translation
+    matrix.SetElement(0, 3, x)
+    matrix.SetElement(1, 3, y)
+    matrix.SetElement(2, 3, z)
+
+    matrix.SetElement(3, 0, 0.0)
+    matrix.SetElement(3, 1, 0.0)
+    matrix.SetElement(3, 2, 0.0)
+    matrix.SetElement(3, 3, 1.0)
+
 
   def hasImageData(self,volumeNode):
     """This is a dummy logic method that
@@ -184,111 +210,11 @@ class FiducialRegistrationTestLogic(ScriptedLoadableModuleLogic):
       return False
     return True
 
-  def takeScreenshot(self,name,description,type=-1):
-    # show the message even if not taking a screen shot
-    self.delayDisplay(description)
-
-    if self.enableScreenshots == 0:
-      return
-
-    lm = slicer.app.layoutManager()
-    # switch on the type to get the requested window
-    widget = 0
-    if type == slicer.qMRMLScreenShotDialog.FullLayout:
-      # full layout
-      widget = lm.viewport()
-    elif type == slicer.qMRMLScreenShotDialog.ThreeD:
-      # just the 3D window
-      widget = lm.threeDWidget(0).threeDView()
-    elif type == slicer.qMRMLScreenShotDialog.Red:
-      # red slice window
-      widget = lm.sliceWidget("Red")
-    elif type == slicer.qMRMLScreenShotDialog.Yellow:
-      # yellow slice window
-      widget = lm.sliceWidget("Yellow")
-    elif type == slicer.qMRMLScreenShotDialog.Green:
-      # green slice window
-      widget = lm.sliceWidget("Green")
-    else:
-      # default to using the full window
-      widget = slicer.util.mainWindow()
-      # reset the type so that the node is set correctly
-      type = slicer.qMRMLScreenShotDialog.FullLayout
-
-    # grab and convert to vtk image data
-    qpixMap = qt.QPixmap().grabWidget(widget)
-    qimage = qpixMap.toImage()
-    imageData = vtk.vtkImageData()
-    slicer.qMRMLUtils().qImageToVtkImageData(qimage,imageData)
-
-    annotationLogic = slicer.modules.annotations.logic()
-    annotationLogic.CreateSnapShot(name, description, type, self.screenshotScaleFactor, imageData)
-
   def run(self,inputVolume,outputVolume,enableScreenshots=0,screenshotScaleFactor=1):
     """
     Run the actual algorithm
     """
 
-    self.delayDisplay('Running the aglorithm')
-
-    self.enableScreenshots = enableScreenshots
-    self.screenshotScaleFactor = screenshotScaleFactor
-
-    self.takeScreenshot('FiducialRegistrationTest-Start','Start',-1)
-
     return True
 
 
-class FiducialRegistrationTestTest(ScriptedLoadableModuleTest):
-  """
-  This is the test case for your scripted module.
-  Uses ScriptedLoadableModuleTest base class, available at:
-  https://github.com/Slicer/Slicer/blob/master/Base/Python/slicer/ScriptedLoadableModule.py
-  """
-
-  def setUp(self):
-    """ Do whatever is needed to reset the state - typically a scene clear will be enough.
-    """
-    slicer.mrmlScene.Clear(0)
-
-  def runTest(self):
-    """Run as few or as many tests as needed here.
-    """
-    self.setUp()
-    self.test_FiducialRegistrationTest1()
-
-  def test_FiducialRegistrationTest1(self):
-    """ Ideally you should have several levels of tests.  At the lowest level
-    tests sould exercise the functionality of the logic with different inputs
-    (both valid and invalid).  At higher levels your tests should emulate the
-    way the user would interact with your code and confirm that it still works
-    the way you intended.
-    One of the most important features of the tests is that it should alert other
-    developers when their changes will have an impact on the behavior of your
-    module.  For example, if a developer removes a feature that you depend on,
-    your test should break so they know that the feature is needed.
-    """
-
-    self.delayDisplay("Starting the test")
-    #
-    # first, get some data
-    #
-    import urllib
-    downloads = (
-        ('http://slicer.kitware.com/midas3/download?items=5767', 'FA.nrrd', slicer.util.loadVolume),
-        )
-
-    for url,name,loader in downloads:
-      filePath = slicer.app.temporaryPath + '/' + name
-      if not os.path.exists(filePath) or os.stat(filePath).st_size == 0:
-        print('Requesting download %s from %s...\n' % (name, url))
-        urllib.urlretrieve(url, filePath)
-      if loader:
-        print('Loading %s...\n' % (name,))
-        loader(filePath)
-    self.delayDisplay('Finished with download and loading\n')
-
-    volumeNode = slicer.util.getNode(pattern="FA")
-    logic = FiducialRegistrationTestLogic()
-    self.assertTrue( logic.hasImageData(volumeNode) )
-    self.delayDisplay('Test passed!')
