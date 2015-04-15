@@ -117,9 +117,18 @@ RenderSpatialObjectImageFilter< TInput, TOutput >
     inputRegion.SetSize(regionSize);
     outputRegion.SetIndex(regionIndex);
     outputRegion.SetSize(regionSize);
-    
-    it = ImageRegionConstIterator<InputImageType>(input, inputRegion);
-    oit = ImageRegionIterator<OutputImageType>(output, outputRegion);
+
+    try
+      {
+      it = ImageRegionConstIterator<InputImageType>(input, inputRegion);
+      oit = ImageRegionIterator<OutputImageType>(output, outputRegion);
+      }
+    catch ( ExceptionObject & excep )
+      {
+      std::cerr << excep.what() << std::endl;
+      continue;
+      }
+
 
     oit.GoToBegin();
     it.GoToBegin();
