@@ -3,6 +3,7 @@ import unittest
 import random
 import math
 import tempfile
+import time
 from __main__ import vtk, qt, ctk, slicer
 from slicer.ScriptedLoadableModule import *
 
@@ -117,14 +118,14 @@ class FiducialRegistrationTestWidget(ScriptedLoadableModuleWidget):
 
 
     #
-    # Parameters Area
+    # Test Area
     #
-    parametersCollapsibleButton = ctk.ctkCollapsibleButton()
-    parametersCollapsibleButton.text = "Parameters"
-    self.layout.addWidget(parametersCollapsibleButton)
+    testCollapsibleButton = ctk.ctkCollapsibleButton()
+    testCollapsibleButton.text = "Test"
+    self.layout.addWidget(testCollapsibleButton)
 
     # Layout within the dummy collapsible button
-    parametersFormLayout = qt.QFormLayout(parametersCollapsibleButton)
+    parametersFormLayout = qt.QFormLayout(testCollapsibleButton)
 
     #
     # input volume selector
@@ -139,23 +140,38 @@ class FiducialRegistrationTestWidget(ScriptedLoadableModuleWidget):
     self.inputSelector.showChildNodeTypes = False
     self.inputSelector.setMRMLScene( slicer.mrmlScene )
     self.inputSelector.setToolTip( "Pick the input to the algorithm." )
-    parametersFormLayout.addRow("Input Volume: ", self.inputSelector)
+    parametersFormLayout.addRow("Input Fiducial: ", self.inputSelector)
 
     #
-    # output volume selector
+    # reference volume selector
     #
-    self.outputSelector = slicer.qMRMLNodeComboBox()
-    self.outputSelector.nodeTypes = ( ("vtkMRMLScalarVolumeNode"), "" )
-    self.outputSelector.addAttribute( "vtkMRMLScalarVolumeNode", "LabelMap", 0 )
-    self.outputSelector.selectNodeUponCreation = False
-    self.outputSelector.addEnabled = True
-    self.outputSelector.removeEnabled = True
-    self.outputSelector.noneEnabled = False
-    self.outputSelector.showHidden = False
-    self.outputSelector.showChildNodeTypes = False
-    self.outputSelector.setMRMLScene( slicer.mrmlScene )
-    self.outputSelector.setToolTip( "Pick the output to the algorithm." )
-    parametersFormLayout.addRow("Output Volume: ", self.outputSelector)
+    self.referenceSelector = slicer.qMRMLNodeComboBox()
+    self.referenceSelector.nodeTypes = ( ("vtkMRMLScalarVolumeNode"), "" )
+    self.referenceSelector.addAttribute( "vtkMRMLScalarVolumeNode", "LabelMap", 0 )
+    self.referenceSelector.selectNodeUponCreation = False
+    self.referenceSelector.addEnabled = True
+    self.referenceSelector.removeEnabled = True
+    self.referenceSelector.noneEnabled = False
+    self.referenceSelector.showHidden = False
+    self.referenceSelector.showChildNodeTypes = False
+    self.referenceSelector.setMRMLScene( slicer.mrmlScene )
+    self.referenceSelector.setToolTip( "Pick the reference to the algorithm." )
+    parametersFormLayout.addRow("Reference Volume: ", self.referenceSelector)
+
+    logFileLayout = qt.QHBoxLayout()
+    self.logFileLineEdit = qt.QLineEdit()
+    self.logFileLineEdit.text = ''
+    self.logFileLineEdit.readOnly = True
+    self.logFileLineEdit.frame = True
+    self.logFileLineEdit.styleSheet = "QLineEdit { background:transparent; }"
+    self.logFileLineEdit.cursor = qt.QCursor(qt.Qt.IBeamCursor)
+    logFileLayout.addWidget(self.logFileLineEdit)
+
+    self.logFileButton = qt.QPushButton("Choose File...")
+    self.logFileButton.toolTip = "Choose log file from dialog box"
+    logFileLayout.addWidget(self.logFileButton)
+
+    parametersFormLayout.addRow("Log file:", logFileLayout)
 
     #
     # Apply Button
@@ -168,15 +184,16 @@ class FiducialRegistrationTestWidget(ScriptedLoadableModuleWidget):
     # connections
     self.fiducialSelector.connect("currentNodeChanged(vtkMRMLNode*)", self.onFiducialSelect)
     self.reconfigureButton.connect('clicked(bool)', self.onReconfigureButton)
+    self.logFileButton.connect('clicked(bool)', self.onLogFileButton)
     self.applyButton.connect('clicked(bool)', self.onApplyButton)
     self.inputSelector.connect("currentNodeChanged(vtkMRMLNode*)", self.onSelect)
-    self.outputSelector.connect("currentNodeChanged(vtkMRMLNode*)", self.onSelect)
+    self.referenceSelector.connect("currentNodeChanged(vtkMRMLNode*)", self.onSelect)
 
     # Add vertical spacer
     self.layout.addStretch(1)
 
     # Create logic
-    self.logic = FiducialRegistrationTestLogic()
+    self.logic = FiducialRegistrationTestLogic(None)
 
     # Enable buttons, if nodes are selected
     self.onSelect()
@@ -186,7 +203,7 @@ class FiducialRegistrationTestWidget(ScriptedLoadableModuleWidget):
     pass
 
   def onSelect(self):
-    self.applyButton.enabled = self.inputSelector.currentNode() and self.outputSelector.currentNode()
+    self.applyButton.enabled = self.inputSelector.currentNode() and self.referenceSelector.currentNode()
 
   def onFiducialSelect(self):
     self.reconfigureButton.enabled = self.fiducialSelector.currentNode()
@@ -195,8 +212,15 @@ class FiducialRegistrationTestWidget(ScriptedLoadableModuleWidget):
     if self.fiducialSelector.currentNode():
       self.logic.configFiducialModel(self.fiducialSelector.currentNode(), self.radiusEdit.value, self.numFiducialsEdit.value, 20.0)
 
+  def onLogFileButton(self):
+ 
+    fileName = qt.QFileDialog.getSaveFileName(None, 'Open Log File', '', 'txt files (*.txt)')
+
+    if fileName:
+      self.logFileLineEdit.setText(fileName)
+
   def onApplyButton(self):
-    self.logic.run(self.inputSelector.currentNode(), self.outputSelector.currentNode())
+    self.logic.run(self.inputSelector.currentNode(), self.referenceSelector.currentNode(), self.logFileLineEdit.text)
 
   def onReload(self, moduleName="FiducialRegistrationTest"):
     # Generic reload method for any scripted module.
@@ -209,6 +233,11 @@ class FiducialRegistrationTestWidget(ScriptedLoadableModuleWidget):
 #
 
 class FiducialRegistrationTestLogic(ScriptedLoadableModuleLogic):
+
+  def __init__(self, parent):
+    ScriptedLoadableModuleLogic.__init__(self, parent)
+    self.logFilePath = ''
+    self.logFile = None
 
 
   def configFiducialModel(self, fiducialNode, radius, nFiducials, minDistance):
@@ -315,14 +344,13 @@ class FiducialRegistrationTestLogic(ScriptedLoadableModuleLogic):
     return True
 
   
-  def runRegistration(self, fiducialNode, volumeNode, matrix):
+  def runRegistration(self, fiducialNode, volumeNode, testFiducialNode):
 
     logging.info('Processing started')
 
     # Get CLI modules
     fiducialDetectionCLI = slicer.modules.sphericalfiducialdetection
     circleFitCLI = slicer.modules.circlefit
-    icpRegistrationCLI = slicer.modules.icpregistration
 
     # Create temporary filename to store detected fiducials
     tmpImageFiducialFilename = tempfile.NamedTemporaryFile().name + ".fcsv"
@@ -356,8 +384,10 @@ class FiducialRegistrationTestLogic(ScriptedLoadableModuleLogic):
     # Import fiducials in slicer scene
     (success, imageFiducialNode) = slicer.util.loadMarkupsFiducialList(tmpImageFiducialFilename, True)
     imageFiducialNode.SetName(slicer.mrmlScene.GenerateUniqueName('ImageFiducialsDetected'))
+    
+    
+    #### Circle Fitting
 
-    # Circle Fitting
     cfTransform = slicer.mrmlScene.CreateNodeByClass("vtkMRMLLinearTransformNode")
     slicer.mrmlScene.AddNode(cfTransform)
 
@@ -367,9 +397,28 @@ class FiducialRegistrationTestLogic(ScriptedLoadableModuleLogic):
     circleFitParameters["radius"] = 50.0
     circleFitParameters["registration"] = cfTransform
 
+    time0 = time.clock()
     slicer.cli.run(circleFitCLI, None, circleFitParameters, True)
+    time1 = time.clock()
+
+    matrix = vtk.vtkMatrix4x4()
+
+    cfTransform.GetMatrixTransformToParent(matrix)
+    self.printMatrixInLine("CircleFit", matrix)
+    t = time1-time0
+    self.printLog ("Time - CircleFit: %f\n" % t)
+
+    self.evaluateRegistration(fiducialNode, testFiducialNode, matrix)
     
-    # ICP Registration
+    slicer.mrmlScene.RemoveNode(cfTransform)
+
+    #### ICP
+
+    initialTransform = slicer.mrmlScene.CreateNodeByClass("vtkMRMLLinearTransformNode")
+    slicer.mrmlScene.AddNode(initialTransform)
+
+    icpRegistrationCLI = slicer.modules.icpregistration
+
     icpTransform = slicer.mrmlScene.CreateNodeByClass("vtkMRMLLinearTransformNode")
     slicer.mrmlScene.AddNode(icpTransform)
 
@@ -377,25 +426,47 @@ class FiducialRegistrationTestLogic(ScriptedLoadableModuleLogic):
     registrationParameters = {}
     registrationParameters["movingPoints"] = fiducialNode
     registrationParameters["fixedPoints"] = imageFiducialNode
-    registrationParameters["initialTransform"] = cfTransform
+    registrationParameters["initialTransform"] = initialTransform
     registrationParameters["registrationTransform"] = icpTransform
     
     registrationParameters["iterations"] = 2000
     registrationParameters["gradientTolerance"] = 0.0001
     registrationParameters["valueTolerance"] = 0.0001
     registrationParameters["epsilonFunction"] = 0.00001
-    
-    cliNode = slicer.cli.run(icpRegistrationCLI, None, registrationParameters, True)
 
-    cfTransform.GetMatrixTransformToParent(matrix)
-    self.printMatrixInLine("pre-icp", matrix)
+    time0 = time.clock()
+    cliNode = slicer.cli.run(icpRegistrationCLI, None, registrationParameters, True)
+    time1 = time.clock()
 
     icpTransform.GetMatrixTransformToParent(matrix)
-    self.printMatrixInLine("post-icp", matrix)
-    
+    self.printMatrixInLine("ICP", matrix)
+    t = time1-time0
+    self.printLog ("Time - ICP: %f\n" % t)
+
+    self.evaluateRegistration(fiducialNode, testFiducialNode, matrix)
+
     # Cleanup
-    slicer.mrmlScene.RemoveNode(cfTransform)
     slicer.mrmlScene.RemoveNode(icpTransform)
+    
+
+  def evaluateRegistration(self, fiducialNode, testFiducialNode, matrix):
+
+
+    nFid = fiducialNode.GetNumberOfFiducials()
+    for m in range(0, nFid):
+      pos = [0.0, 0.0, 0.0]
+      fiducialNode.GetNthFiducialPosition(m, pos)
+      tpos
+      matrix.MultiplyPoint(pos, tpos)
+
+
+
+      testFiducialNode.AddFiducialFromArray(pos, lb)
+    
+      
+
+
+
 
 
   def generateFiducialImage(self, backgroundVolumeNode, outputVolumeNode, fiducialNode):
@@ -411,22 +482,31 @@ class FiducialRegistrationTestLogic(ScriptedLoadableModuleLogic):
     parameters["toleranceVolume"] = 0.01
 
     cliNode = slicer.cli.run(cli, None, parameters, True)
-    
 
   def printMatrixInLine(self, name, matrix):
-    print("%s: %f, %f, %f, %f, %f, %f, %f, %f, %f, %f, %f, %f, %f, %f, %f, %f" 
-           % (name, 
-              matrix.GetElement(0,0), matrix.GetElement(0,1), matrix.GetElement(0,2), matrix.GetElement(0,3),
-              matrix.GetElement(1,0), matrix.GetElement(1,1), matrix.GetElement(1,2), matrix.GetElement(1,3),
-              matrix.GetElement(2,0), matrix.GetElement(2,1), matrix.GetElement(2,2), matrix.GetElement(2,3),
-              matrix.GetElement(3,0), matrix.GetElement(3,1), matrix.GetElement(3,2), matrix.GetElement(3,3)))
-
-  def run(self, baseFiducial, inputVolume):
+    if self.logFile:
+      self.logFile.write("%s: %f, %f, %f, %f, %f, %f, %f, %f, %f, %f, %f, %f, %f, %f, %f, %f\n" 
+                         % (name, 
+                            matrix.GetElement(0,0), matrix.GetElement(0,1), matrix.GetElement(0,2), matrix.GetElement(0,3),
+                            matrix.GetElement(1,0), matrix.GetElement(1,1), matrix.GetElement(1,2), matrix.GetElement(1,3),
+                            matrix.GetElement(2,0), matrix.GetElement(2,1), matrix.GetElement(2,2), matrix.GetElement(2,3),
+                            matrix.GetElement(3,0), matrix.GetElement(3,1), matrix.GetElement(3,2), matrix.GetElement(3,3)))
+  def printLog(self, text):
+    if self.logFile:
+      self.logFile.write(text)
+    else:
+      print text
+      
+  def run(self, baseFiducial, inputVolume, logPath=None):
     """
     Run the actual algorithm
     """
+
+    if logPath:
+      self.logFilePath = logPath
+      self.logFile = open(logPath, 'a')
+
     srcMatrix = vtk.vtkMatrix4x4()
-    dstMatrix = vtk.vtkMatrix4x4()
     
     xRange = [-50.0, 50.0]
     yRange = [-50.0, 50.0]
@@ -434,42 +514,45 @@ class FiducialRegistrationTestLogic(ScriptedLoadableModuleLogic):
 
     for n in range(1, 2):
 
-      print " aaa %d " % n
-      fiducialVolumeNode = slicer.mrmlScene.CreateNodeByClass("vtkMRMLScalarVolumeNode")
-      slicer.mrmlScene.AddNode(fiducialVolumeNode)
-      fiducialNode = slicer.mrmlScene.CreateNodeByClass("vtkMRMLMarkupsFiducialNode")
-      slicer.mrmlScene.AddNode(fiducialNode)
+      testFiducialVolumeNode = slicer.mrmlScene.CreateNodeByClass("vtkMRMLScalarVolumeNode")
+      slicer.mrmlScene.AddNode(testFiducialVolumeNode)
+      testFiducialNode = slicer.mrmlScene.CreateNodeByClass("vtkMRMLMarkupsFiducialNode")
+      slicer.mrmlScene.AddNode(testFiducialNode)
 
       #numMarkups = baseFiducial.GetNumberOfMarkups()
       #for m in range(0, numMarkups):
       #  markup = baseFiducial.GetNthMarkup(m)
-      #  fiducialNode.AddMarkup(markup)
+      #  testFiducialNode.AddMarkup(markup)
 
-      fiducialNode.RemoveAllMarkups()
+      testFiducialNode.RemoveAllMarkups()
       nFid = baseFiducial.GetNumberOfFiducials()
       for m in range(0, nFid):
         pos = [0.0, 0.0, 0.0]
         baseFiducial.GetNthFiducialPosition(m, pos)
         lb = baseFiducial.GetNthFiducialLabel(m)
-        fiducialNode.AddFiducialFromArray(pos, lb)
+        testFiducialNode.AddFiducialFromArray(pos, lb)
 
-      #fiducialNode.Copy(baseFiducial)
+      #testFiducialNode.Copy(baseFiducial)
 
-      fiducialNode.SetName("TestFiducial-%d" % n)
-      fiducialVolumeNode.SetName("TestImage-%d" % n)
+      testFiducialNode.SetName("TestFiducial-%d" % n)
+      testFiducialVolumeNode.SetName("TestImage-%d" % n)
 
       self.generateRandomTransform(xRange, yRange, zRange, srcMatrix)
       randomTransform = slicer.mrmlScene.CreateNodeByClass("vtkMRMLLinearTransformNode")
       randomTransform.SetMatrixTransformToParent(srcMatrix)
       slicer.mrmlScene.AddNode(randomTransform)
 
+      testFiducialNode.ApplyTransformMatrix(srcMatrix)
 
-      fiducialNode.ApplyTransformMatrix(srcMatrix)
-
-      self.generateFiducialImage(inputVolume, fiducialVolumeNode, fiducialNode)
+      self.generateFiducialImage(inputVolume, testFiducialVolumeNode, testFiducialNode)
       self.printMatrixInLine("src", srcMatrix)
-      self.runRegistration(baseFiducial, fiducialVolumeNode, dstMatrix)
-        
+
+      self.runRegistration(baseFiducial, testFiducialVolumeNode, testFiducialNode)
+
+
+    if self.logFile:
+      self.logFile.close()
+
     return True
 
 
