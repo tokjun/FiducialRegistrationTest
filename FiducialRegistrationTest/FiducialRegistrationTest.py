@@ -1,5 +1,8 @@
 import os
 import unittest
+import random
+import math
+import tempfile
 from __main__ import vtk, qt, ctk, slicer
 from slicer.ScriptedLoadableModule import *
 
@@ -75,8 +78,7 @@ class FiducialRegistrationTestWidget(ScriptedLoadableModuleWidget):
     # input volume selector
     #
     self.inputSelector = slicer.qMRMLNodeComboBox()
-    self.inputSelector.nodeTypes = ( ("vtkMRMLScalarVolumeNode"), "" )
-    self.inputSelector.addAttribute( "vtkMRMLScalarVolumeNode", "LabelMap", 0 )
+    self.inputSelector.nodeTypes = ( ("vtkMRMLMarkupsFiducialNode"), "" )
     self.inputSelector.selectNodeUponCreation = True
     self.inputSelector.addEnabled = False
     self.inputSelector.removeEnabled = False
@@ -146,7 +148,7 @@ class FiducialRegistrationTestWidget(ScriptedLoadableModuleWidget):
 
   def onApplyButton(self):
     logic = FiducialRegistrationTestLogic()
-    logic.run(self.inputSelector.currentNode(), self.outputSelector.currentNode(), enableScreenshotsFlag,screenshotScaleFactor)
+    logic.run(self.inputSelector.currentNode(), self.outputSelector.currentNode())
 
   def onReload(self, moduleName="FiducialRegistrationTest"):
     # Generic reload method for any scripted module.
@@ -210,11 +212,158 @@ class FiducialRegistrationTestLogic(ScriptedLoadableModuleLogic):
       return False
     return True
 
-  def run(self,inputVolume,outputVolume,enableScreenshots=0,screenshotScaleFactor=1):
+  
+  def runRegistration(self, fiducialNode, volumeNode, matrix):
+
+    logging.info('Processing started')
+
+    # Get CLI modules
+    fiducialDetectionCLI = slicer.modules.sphericalfiducialdetection
+    circleFitCLI = slicer.modules.circlefit
+    icpRegistrationCLI = slicer.modules.icpregistration
+
+    # Create temporary filename to store detected fiducials
+    tmpImageFiducialFilename = tempfile.NamedTemporaryFile().name + ".fcsv"
+    
+    # Call fiducial detection
+    detectionParameters = {}
+    detectionParameters["inputVolume"] = volumeNode
+    detectionParameters["outputFile"] = tmpImageFiducialFilename
+    detectionParameters["threshold"] = 0.0
+    detectionParameters["numberOfSpheres"] = fiducialNode.GetNumberOfFiducials()
+    detectionParameters["sigmaGrad"] = 1.0
+    detectionParameters["gradThreshold"] = 0.1
+    detectionParameters["minRadius"] = 8.0
+    detectionParameters["maxRadius"] = 12.0
+    detectionParameters["variance"] = 1.0
+    detectionParameters["outputThreshold"] = 0.5
+    detectionParameters["sphereRadiusRatio"] = 1.0
+
+    detectionParameters["alpha"] = 0.8
+    detectionParameters["beta"] = 0.8
+    detectionParameters["gamma"] = 0.8
+
+    detectionParameters["minSigma"] = 3.0
+    detectionParameters["maxSigma"] = 3.0
+    detectionParameters["stepSigma"] = 1.0
+    
+    detectionParameters["debugSwitch"] = 0
+    
+    slicer.cli.run(fiducialDetectionCLI, None, detectionParameters, True)
+
+    # Import fiducials in slicer scene
+    (success, imageFiducialNode) = slicer.util.loadMarkupsFiducialList(tmpImageFiducialFilename, True)
+    imageFiducialNode.SetName(slicer.mrmlScene.GenerateUniqueName('ImageFiducialsDetected'))
+
+    # Circle Fitting
+    initialTransform = slicer.mrmlScene.CreateNodeByClass("vtkMRMLLinearTransformNode")
+    slicer.mrmlScene.AddNode(initialTransform)
+
+    circleFitParameters = {}
+    circleFitParameters["movingPoints"] = fiducialNode
+    circleFitParameters["fixedPoints"] = imageFiducialNode
+    circleFitParameters["radius"] = 50.0
+    circleFitParameters["registration"] = initialTransform
+
+    slicer.cli.run(circleFitCLI, None, circleFitParameters, True)
+
+    initialTransform.GetMatrixTransformToParent(matrix)
+
+    #slicer.mrmlScene.RemoveNode(initialTransform)
+
+    ## ICP Registration
+    #icpRegistrationError = 0.0
+    #registrationParameters = {}
+    #registrationParameters["movingPoints"] = fiducialList
+    #registrationParameters["fixedPoints"] = imageFiducialNode
+    #registrationParameters["initialTransform"] = initialTransform
+    #registrationParameters["registrationTransform"] = outputTransform
+    #
+    #registrationParameters["iterations"] = 2000
+    #registrationParameters["gradientTolerance"] = 0.0001
+    #registrationParameters["valueTolerance"] = 0.0001
+    #registrationParameters["epsilonFunction"] = 0.00001
+    #
+    #cliNode = slicer.cli.run(icpRegistrationCLI, None, registrationParameters, True)
+    #
+    ## Cleanup
+    #slicer.mrmlScene.RemoveNode(initialTransform)
+
+
+  def generateFiducialImage(self, backgroundVolumeNode, outputVolumeNode, fiducialNode):
+
+    cli = slicer.modules.fiducialimagemaker
+
+    # ICP Registration
+    parameters = {}
+    parameters["inputVolume"] = backgroundVolumeNode
+    parameters["outputVolume"] = outputVolumeNode
+    parameters["marker"] = fiducialNode
+    parameters["radius"] = 10.0
+    parameters["defaultVoxelValue"] = 200.0
+    parameters["toleranceVolume"] = 0.01
+
+    cliNode = slicer.cli.run(cli, None, parameters, True)
+    
+
+  def printMatrixInLine(self, name, matrix):
+    print("%s: %f, %f, %f, %f, %f, %f, %f, %f, %f, %f, %f, %f, %f, %f, %f, %f" 
+           % (name, 
+              matrix.GetElement(0,0), matrix.GetElement(0,1), matrix.GetElement(0,2), matrix.GetElement(0,3),
+              matrix.GetElement(1,0), matrix.GetElement(1,1), matrix.GetElement(1,2), matrix.GetElement(1,3),
+              matrix.GetElement(2,0), matrix.GetElement(2,1), matrix.GetElement(2,2), matrix.GetElement(2,3),
+              matrix.GetElement(3,0), matrix.GetElement(3,1), matrix.GetElement(3,2), matrix.GetElement(3,3)))
+
+  def run(self, baseFiducial, inputVolume):
     """
     Run the actual algorithm
     """
+    srcMatrix = vtk.vtkMatrix4x4()
+    dstMatrix = vtk.vtkMatrix4x4()
+    
+    xRange = [-50.0, 50.0]
+    yRange = [-50.0, 50.0]
+    zRange = [-50.0, 50.0]
 
+    for n in range(1, 2):
+
+      print " aaa %d " % n
+      fiducialVolumeNode = slicer.mrmlScene.CreateNodeByClass("vtkMRMLScalarVolumeNode")
+      slicer.mrmlScene.AddNode(fiducialVolumeNode)
+      fiducialNode = slicer.mrmlScene.CreateNodeByClass("vtkMRMLMarkupsFiducialNode")
+      slicer.mrmlScene.AddNode(fiducialNode)
+
+      #numMarkups = baseFiducial.GetNumberOfMarkups()
+      #for m in range(0, numMarkups):
+      #  markup = baseFiducial.GetNthMarkup(m)
+      #  fiducialNode.AddMarkup(markup)
+
+      fiducialNode.RemoveAllMarkups()
+      nFid = baseFiducial.GetNumberOfFiducials()
+      for m in range(0, nFid):
+        pos = [0.0, 0.0, 0.0]
+        baseFiducial.GetNthFiducialPosition(m, pos)
+        lb = baseFiducial.GetNthFiducialLabel(m)
+        fiducialNode.AddFiducialFromArray(pos, lb)
+
+      fiducialNode.Copy(baseFiducial)
+
+      fiducialNode.SetName("TestFiducial-%d" % n)
+      fiducialVolumeNode.SetName("TestImage-%d" % n)
+
+      self.generateRandomTransform(xRange, yRange, zRange, srcMatrix)
+      randomTransform = slicer.mrmlScene.CreateNodeByClass("vtkMRMLLinearTransformNode")
+      randomTransform.SetMatrixTransformToParent(srcMatrix)
+      slicer.mrmlScene.AddNode(randomTransform)
+
+
+      fiducialNode.ApplyTransformMatrix(srcMatrix)
+
+      self.generateFiducialImage(inputVolume, fiducialVolumeNode, fiducialNode)
+      self.printMatrixInLine("src", srcMatrix)
+      self.runRegistration(baseFiducial, fiducialVolumeNode, dstMatrix)
+      self.printMatrixInLine("dst", dstMatrix)
+        
     return True
 
 
