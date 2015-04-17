@@ -43,7 +43,7 @@
       <flag>r</flag>
       <label>Radius</label>
       <description>Radius of fiducial markers</description>
-      <default>10.0</default>
+      <default>5.0</default>
     </double>
     <double>
       <name>defaultVoxelValue</name>

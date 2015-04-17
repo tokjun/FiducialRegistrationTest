@@ -151,7 +151,7 @@ RenderSpatialObjectImageFilter< TInput, TOutput >
       
       this->ComputeVerticesOfCubicRegion(point, vertices);
       
-      double partialVolume = this->ComputeObjectVolumeInCube(vertices, spacing);
+      double partialVolume = this->ComputeObjectVolumeInCube(vertices, spacing, fidID);
       double percentage = partialVolume / voxelVolume;
       
       // TODO: How is the input image incorporated?
@@ -333,7 +333,7 @@ RenderSpatialObjectImageFilter< TInput, TOutput >
       subvolumeVertices[p6] = (vertices[p2] + vertices[p6]) / 2.0;
       subvolumeVertices[p7] = (vertices[p3] + vertices[p7]) / 2.0;
       
-      double volume1 = this->ComputeObjectVolumeInCube(subvolumeVertices, subvolumeSpacing);
+      double volume1 = this->ComputeObjectVolumeInCube(subvolumeVertices, subvolumeSpacing, objectID);
       
       subvolumeVertices[p0] = subvolumeVertices[p4];
       subvolumeVertices[p1] = subvolumeVertices[p5];
@@ -345,7 +345,7 @@ RenderSpatialObjectImageFilter< TInput, TOutput >
       subvolumeVertices[p6] = vertices[p6];
       subvolumeVertices[p7] = vertices[p7];
       
-      double volume2 = this->ComputeObjectVolumeInCube(subvolumeVertices, subvolumeSpacing);
+      double volume2 = this->ComputeObjectVolumeInCube(subvolumeVertices, subvolumeSpacing, objectID);
 
       return (volume1 + volume2);
 
