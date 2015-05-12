@@ -4,6 +4,7 @@ import random
 import math
 import tempfile
 import time
+import numpy
 from __main__ import vtk, qt, ctk, slicer
 from slicer.ScriptedLoadableModule import *
 
@@ -408,7 +409,7 @@ class FiducialRegistrationTestLogic(ScriptedLoadableModuleLogic):
     t = time1-time0
     self.printLog ("Time - CircleFit: %f\n" % t)
 
-    self.evaluateRegistration(fiducialNode, testFiducialNode, matrix)
+    self.evaluateRegistration(fiducialNode, testFiducialNode, imageFiducialNode, matrix)
     
     slicer.mrmlScene.RemoveNode(cfTransform)
 
@@ -449,24 +450,56 @@ class FiducialRegistrationTestLogic(ScriptedLoadableModuleLogic):
     slicer.mrmlScene.RemoveNode(icpTransform)
     
 
-  def evaluateRegistration(self, fiducialNode, testFiducialNode, matrix):
-
+  def evaluateRegistration(self, fiducialNode, testFiducialNode, imageFiducialNode, matrix):
 
     nFid = fiducialNode.GetNumberOfFiducials()
-    for m in range(0, nFid):
-      pos = [0.0, 0.0, 0.0]
-      fiducialNode.GetNthFiducialPosition(m, pos)
-      tpos
-      matrix.MultiplyPoint(pos, tpos)
 
+    fle = 0.0
+    fre = 0.0
 
+    for i in range(0, nFid):
 
-      testFiducialNode.AddFiducialFromArray(pos, lb)
-    
+      ## Get original fiducial point in the model
+      mfid = [0.0, 0.0, 0.0, 1.0]
+      fiducialNode.GetNthFiducialPosition(i, mfid[0:3])
+      a_mfid = numpy.array(mfid[0:3])
+
+      ## Transform fiducials using the registration result ('matrix')
+      tfid = [0.0, 0.0, 0.0, 1.0]
+      matrix.MultiplyPoint(mfid, tfid)
+      a_tfid = numpy.array(tfid[0:3])
+
+      ## Target fiducial to generate simulation image
+      sfid = [0.0, 0.0, 0.0]
+      testFiducialNode.GetNthFiducialPosition(i, sfid)
+      a_sfid = numpy.array(sfid)
+
+      ## Calculate FRE
+      d_st = a_sfid-a_tfid
+      fre = fre + numpy.inner(d_st, d_st)
       
+      ## Find nearest point among the detected points
+      min_sqfle = numpy.inf
+      min_point = [0.0, 0.0, 0.0]
+      for j in range(0, nFid):
+        ifid = [0.0, 0.0, 0.0]
+        imageFiducialNode.GetNthFiducialPosition(j, ifid)
+        a_ifid = numpy.array(ifid)
 
+        ## Square FLE
+        d_is = a_ifid-a_sfid
+        sqfle = numpy.inner(d_is, d_is)
+        if sqfle < min_sqfle:
+          min_sqfle = sqfle
 
+      ## FLE
+      fle = fle + min_sqfle
 
+    fre = numpy.sqrt(fre / nFid)
+    fle = numpy.sqrt(fle / nFid)
+
+    if self.logFile:
+      self.logFile.write("FRE/FLE: %f, %f" % (fre, fle))
 
 
   def generateFiducialImage(self, backgroundVolumeNode, outputVolumeNode, fiducialNode):
