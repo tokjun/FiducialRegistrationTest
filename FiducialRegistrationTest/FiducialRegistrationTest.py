@@ -358,7 +358,7 @@ class FiducialRegistrationTestLogic(ScriptedLoadableModuleLogic):
     
     # Call fiducial detection
     detectionParameters = {}
-    detectionParameters["inputVolume"] = volumeNode
+    detectionParameters["inputVolume"] = volumeNode.GetID()
     detectionParameters["outputFile"] = tmpImageFiducialFilename
     detectionParameters["threshold"] = 0.0
     detectionParameters["numberOfSpheres"] = fiducialNode.GetNumberOfFiducials()
@@ -369,7 +369,6 @@ class FiducialRegistrationTestLogic(ScriptedLoadableModuleLogic):
     detectionParameters["variance"] = 1.0
     detectionParameters["outputThreshold"] = 0.5
     detectionParameters["sphereRadiusRatio"] = 1.0
-
     detectionParameters["alpha"] = 0.8
     detectionParameters["beta"] = 0.8
     detectionParameters["gamma"] = 0.8
@@ -379,8 +378,12 @@ class FiducialRegistrationTestLogic(ScriptedLoadableModuleLogic):
     detectionParameters["stepSigma"] = 1.0
     
     detectionParameters["debugSwitch"] = 0
-    
+
+    time0 = time.clock()    
     slicer.cli.run(fiducialDetectionCLI, None, detectionParameters, True)
+    time1 = time.clock()
+    t = time1-time0
+    self.printLog ("Time - marker detection: %f\n" % t)
 
     # Import fiducials in slicer scene
     (success, imageFiducialNode) = slicer.util.loadMarkupsFiducialList(tmpImageFiducialFilename, True)
@@ -393,10 +396,9 @@ class FiducialRegistrationTestLogic(ScriptedLoadableModuleLogic):
     slicer.mrmlScene.AddNode(cfTransform)
 
     circleFitParameters = {}
-    circleFitParameters["movingPoints"] = fiducialNode
-    circleFitParameters["fixedPoints"] = imageFiducialNode
-    circleFitParameters["radius"] = 50.0
-    circleFitParameters["registration"] = cfTransform
+    circleFitParameters["movingPoints"] = fiducialNode.GetID()
+    circleFitParameters["fixedPoints"] = imageFiducialNode.GetID()
+    circleFitParameters["registration"] = cfTransform.GetID()
 
     time0 = time.clock()
     slicer.cli.run(circleFitCLI, None, circleFitParameters, True)
@@ -425,10 +427,10 @@ class FiducialRegistrationTestLogic(ScriptedLoadableModuleLogic):
 
     icpRegistrationError = 0.0
     registrationParameters = {}
-    registrationParameters["movingPoints"] = fiducialNode
-    registrationParameters["fixedPoints"] = imageFiducialNode
-    registrationParameters["initialTransform"] = initialTransform
-    registrationParameters["registrationTransform"] = icpTransform
+    registrationParameters["movingPoints"] = fiducialNode.GetID()
+    registrationParameters["fixedPoints"] = imageFiducialNode.GetID()
+    registrationParameters["initialTransform"] = initialTransform.GetID()
+    registrationParameters["registrationTransform"] = icpTransform.GetID()
     
     registrationParameters["iterations"] = 2000
     registrationParameters["gradientTolerance"] = 0.0001
@@ -444,7 +446,7 @@ class FiducialRegistrationTestLogic(ScriptedLoadableModuleLogic):
     t = time1-time0
     self.printLog ("Time - ICP: %f\n" % t)
 
-    self.evaluateRegistration(fiducialNode, testFiducialNode, matrix)
+    self.evaluateRegistration(fiducialNode, testFiducialNode, imageFiducialNode, matrix)
 
     # Cleanup
     slicer.mrmlScene.RemoveNode(icpTransform)
@@ -457,12 +459,14 @@ class FiducialRegistrationTestLogic(ScriptedLoadableModuleLogic):
     fle = 0.0
     fre = 0.0
 
+    print matrix
+
     for i in range(0, nFid):
 
       ## Get original fiducial point in the model
-      mfid = [0.0, 0.0, 0.0, 1.0]
-      fiducialNode.GetNthFiducialPosition(i, mfid[0:3])
-      a_mfid = numpy.array(mfid[0:3])
+      mfid = [0.0, 0.0, 0.0]
+      fiducialNode.GetNthFiducialPosition(i, mfid)
+      mfid.append(1.0)
 
       ## Transform fiducials using the registration result ('matrix')
       tfid = [0.0, 0.0, 0.0, 1.0]
@@ -476,7 +480,9 @@ class FiducialRegistrationTestLogic(ScriptedLoadableModuleLogic):
 
       ## Calculate FRE
       d_st = a_sfid-a_tfid
-      fre = fre + numpy.inner(d_st, d_st)
+      print a_sfid
+      print a_tfid
+      fre = fre + numpy.dot(d_st, d_st)
       
       ## Find nearest point among the detected points
       min_sqfle = numpy.inf
@@ -488,7 +494,7 @@ class FiducialRegistrationTestLogic(ScriptedLoadableModuleLogic):
 
         ## Square FLE
         d_is = a_ifid-a_sfid
-        sqfle = numpy.inner(d_is, d_is)
+        sqfle = numpy.dot(d_is, d_is)
         if sqfle < min_sqfle:
           min_sqfle = sqfle
 
@@ -499,7 +505,7 @@ class FiducialRegistrationTestLogic(ScriptedLoadableModuleLogic):
     fle = numpy.sqrt(fle / nFid)
 
     if self.logFile:
-      self.logFile.write("FRE/FLE: %f, %f" % (fre, fle))
+      self.logFile.write("FRE/FLE: %f, %f\n" % (fre, fle))
 
 
   def generateFiducialImage(self, backgroundVolumeNode, outputVolumeNode, fiducialNode):
@@ -507,14 +513,15 @@ class FiducialRegistrationTestLogic(ScriptedLoadableModuleLogic):
     cli = slicer.modules.fiducialimagemaker
 
     parameters = {}
-    parameters["inputVolume"] = backgroundVolumeNode
-    parameters["outputVolume"] = outputVolumeNode
-    parameters["marker"] = fiducialNode
+    parameters["inputVolume"] = backgroundVolumeNode.GetID()
+    parameters["outputVolume"] = outputVolumeNode.GetID()
+    parameters["marker"] = fiducialNode.GetID()
     parameters["radius"] = 5.0
     parameters["defaultVoxelValue"] = 200.0
     parameters["toleranceVolume"] = 0.01
 
     cliNode = slicer.cli.run(cli, None, parameters, True)
+
 
   def printMatrixInLine(self, name, matrix):
     if self.logFile:
