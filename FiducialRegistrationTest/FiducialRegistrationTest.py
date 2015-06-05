@@ -382,7 +382,7 @@ class FiducialRegistrationTestLogic(ScriptedLoadableModuleLogic):
   
   def runRegistration(self, fiducialNode, volumeNode, testFiducialNode):
 
-    logging.info('Processing started')
+    #logging.info('Processing started')
 
     # Get CLI modules
     fiducialDetectionCLI = slicer.modules.sphericalfiducialdetection
