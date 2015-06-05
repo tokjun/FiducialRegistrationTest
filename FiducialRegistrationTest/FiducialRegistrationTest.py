@@ -294,6 +294,41 @@ class FiducialRegistrationTestLogic(ScriptedLoadableModuleLogic):
       n = n + 1
       
 
+  def generateTransform(self, axis, theta, translate, matrix):
+
+    x = translate[0] 
+    y = translate[1]
+    z = translate[2]
+
+    s = math.sin(theta)
+    c = math.cos(theta)
+
+    ux = axis[0]
+    uy = axis[1]
+    uz = axis[2]
+
+    # Rotation
+    matrix.SetElement(0, 0, c+ux*ux*(1-c))
+    matrix.SetElement(0, 1, ux*uy*(1-c)-uz*s)
+    matrix.SetElement(0, 2, ux*uz*(1-c)+uy*s)
+    matrix.SetElement(1, 0, uy*ux*(1-c)+uz*s)
+    matrix.SetElement(1, 1, c+uy*uy*(1-c))
+    matrix.SetElement(1, 2, uy*uz*(1-c)-ux*s)
+    matrix.SetElement(2, 0, uz*ux*(1-c)-uy*s)
+    matrix.SetElement(2, 1, uz*uy*(1-c)+ux*s)
+    matrix.SetElement(2, 2, c+uz*uz*(1-c))
+
+    # Translation
+    matrix.SetElement(0, 3, x)
+    matrix.SetElement(1, 3, y)
+    matrix.SetElement(2, 3, z)
+
+    matrix.SetElement(3, 0, 0.0)
+    matrix.SetElement(3, 1, 0.0)
+    matrix.SetElement(3, 2, 0.0)
+    matrix.SetElement(3, 3, 1.0)
+
+
   def generateRandomTransform(self, xRange, yRange, zRange, matrix):
     x = random.uniform(xRange[0], xRange[1]) 
     y = random.uniform(yRange[0], yRange[1]) 
@@ -379,11 +414,15 @@ class FiducialRegistrationTestLogic(ScriptedLoadableModuleLogic):
     
     detectionParameters["debugSwitch"] = 0
 
-    time0 = time.clock()    
+    wtime0 = time.time()
+    time0 = time.clock()
     slicer.cli.run(fiducialDetectionCLI, None, detectionParameters, True)
     time1 = time.clock()
+    wtime1 = time.time()
     t = time1-time0
-    self.printLog ("Time - marker detection: %f\n" % t)
+    wt = wtime1-wtime0
+    self.printLog ("Process time for marker detection: %f\n" % t)
+    self.printLog ("Wall time for marker detection: %f\n" % wt)
 
     # Import fiducials in slicer scene
     (success, imageFiducialNode) = slicer.util.loadMarkupsFiducialList(tmpImageFiducialFilename, True)
@@ -400,56 +439,60 @@ class FiducialRegistrationTestLogic(ScriptedLoadableModuleLogic):
     circleFitParameters["fixedPoints"] = imageFiducialNode.GetID()
     circleFitParameters["registration"] = cfTransform.GetID()
 
+    wtime0 = time.time()
     time0 = time.clock()
     slicer.cli.run(circleFitCLI, None, circleFitParameters, True)
     time1 = time.clock()
+    wtime1 = time.time()
 
     matrix = vtk.vtkMatrix4x4()
-
     cfTransform.GetMatrixTransformToParent(matrix)
     self.printMatrixInLine("CircleFit", matrix)
+
     t = time1-time0
-    self.printLog ("Time - CircleFit: %f\n" % t)
+    wt = wtime1-wtime0
+    self.printLog ("Process time for CircleFit: %f\n" % t)
+    self.printLog ("Wall time for CircleFit: %f\n" % wt)
 
     self.evaluateRegistration(fiducialNode, testFiducialNode, imageFiducialNode, matrix)
     
     slicer.mrmlScene.RemoveNode(cfTransform)
 
-    #### ICP
-
-    initialTransform = slicer.mrmlScene.CreateNodeByClass("vtkMRMLLinearTransformNode")
-    slicer.mrmlScene.AddNode(initialTransform)
-
-    icpRegistrationCLI = slicer.modules.icpregistration
-
-    icpTransform = slicer.mrmlScene.CreateNodeByClass("vtkMRMLLinearTransformNode")
-    slicer.mrmlScene.AddNode(icpTransform)
-
-    icpRegistrationError = 0.0
-    registrationParameters = {}
-    registrationParameters["movingPoints"] = fiducialNode.GetID()
-    registrationParameters["fixedPoints"] = imageFiducialNode.GetID()
-    registrationParameters["initialTransform"] = initialTransform.GetID()
-    registrationParameters["registrationTransform"] = icpTransform.GetID()
-    
-    registrationParameters["iterations"] = 2000
-    registrationParameters["gradientTolerance"] = 0.0001
-    registrationParameters["valueTolerance"] = 0.0001
-    registrationParameters["epsilonFunction"] = 0.00001
-
-    time0 = time.clock()
-    cliNode = slicer.cli.run(icpRegistrationCLI, None, registrationParameters, True)
-    time1 = time.clock()
-
-    icpTransform.GetMatrixTransformToParent(matrix)
-    self.printMatrixInLine("ICP", matrix)
-    t = time1-time0
-    self.printLog ("Time - ICP: %f\n" % t)
-
-    self.evaluateRegistration(fiducialNode, testFiducialNode, imageFiducialNode, matrix)
-
-    # Cleanup
-    slicer.mrmlScene.RemoveNode(icpTransform)
+    ##### ICP
+    #
+    #initialTransform = slicer.mrmlScene.CreateNodeByClass("vtkMRMLLinearTransformNode")
+    #slicer.mrmlScene.AddNode(initialTransform)
+    #
+    #icpRegistrationCLI = slicer.modules.icpregistration
+    #
+    #icpTransform = slicer.mrmlScene.CreateNodeByClass("vtkMRMLLinearTransformNode")
+    #slicer.mrmlScene.AddNode(icpTransform)
+    #
+    #icpRegistrationError = 0.0
+    #registrationParameters = {}
+    #registrationParameters["movingPoints"] = fiducialNode.GetID()
+    #registrationParameters["fixedPoints"] = imageFiducialNode.GetID()
+    #registrationParameters["initialTransform"] = initialTransform.GetID()
+    #registrationParameters["registrationTransform"] = icpTransform.GetID()
+    #
+    #registrationParameters["iterations"] = 2000
+    #registrationParameters["gradientTolerance"] = 0.0001
+    #registrationParameters["valueTolerance"] = 0.0001
+    #registrationParameters["epsilonFunction"] = 0.00001
+    #
+    #time0 = time.clock()
+    #cliNode = slicer.cli.run(icpRegistrationCLI, None, registrationParameters, True)
+    #time1 = time.clock()
+    #
+    #icpTransform.GetMatrixTransformToParent(matrix)
+    #self.printMatrixInLine("ICP", matrix)
+    #t = time1-time0
+    #self.printLog ("Time - ICP: %f\n" % t)
+    #
+    ##self.evaluateRegistration(fiducialNode, testFiducialNode, imageFiducialNode, matrix)
+    #
+    ## Cleanup
+    #slicer.mrmlScene.RemoveNode(icpTransform)
     
 
   def evaluateRegistration(self, fiducialNode, testFiducialNode, imageFiducialNode, matrix):
@@ -555,14 +598,9 @@ class FiducialRegistrationTestLogic(ScriptedLoadableModuleLogic):
     for n in range(1, 2):
 
       testFiducialVolumeNode = slicer.mrmlScene.CreateNodeByClass("vtkMRMLScalarVolumeNode")
-      slicer.mrmlScene.AddNode(testFiducialVolumeNode)
       testFiducialNode = slicer.mrmlScene.CreateNodeByClass("vtkMRMLMarkupsFiducialNode")
+      slicer.mrmlScene.AddNode(testFiducialVolumeNode)
       slicer.mrmlScene.AddNode(testFiducialNode)
-
-      #numMarkups = baseFiducial.GetNumberOfMarkups()
-      #for m in range(0, numMarkups):
-      #  markup = baseFiducial.GetNthMarkup(m)
-      #  testFiducialNode.AddMarkup(markup)
 
       testFiducialNode.RemoveAllMarkups()
       nFid = baseFiducial.GetNumberOfFiducials()
@@ -572,8 +610,6 @@ class FiducialRegistrationTestLogic(ScriptedLoadableModuleLogic):
         lb = baseFiducial.GetNthFiducialLabel(m)
         testFiducialNode.AddFiducialFromArray(pos, lb)
 
-      #testFiducialNode.Copy(baseFiducial)
-
       testFiducialNode.SetName("TestFiducial-%d" % n)
       testFiducialVolumeNode.SetName("TestImage-%d" % n)
 
@@ -581,14 +617,18 @@ class FiducialRegistrationTestLogic(ScriptedLoadableModuleLogic):
       randomTransform = slicer.mrmlScene.CreateNodeByClass("vtkMRMLLinearTransformNode")
       randomTransform.SetMatrixTransformToParent(srcMatrix)
       slicer.mrmlScene.AddNode(randomTransform)
+      randomTransform.SetName("TestRandomTransform-%d" % n)
 
       testFiducialNode.ApplyTransformMatrix(srcMatrix)
 
       self.generateFiducialImage(inputVolume, testFiducialVolumeNode, testFiducialNode)
-      self.printMatrixInLine("src", srcMatrix)
+      self.printMatrixInLine("Reference", srcMatrix)
 
       self.runRegistration(baseFiducial, testFiducialVolumeNode, testFiducialNode)
 
+      #slicer.mrmlScene.RemoveNode(randomTransform)
+      #slicer.mrmlScene.RemoveNode(testFiducialVolumeNode)
+      #slicer.mrmlScene.RemoveNode(testFiducialNode)
 
     if self.logFile:
       self.logFile.close()
