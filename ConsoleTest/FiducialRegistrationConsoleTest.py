@@ -31,7 +31,7 @@ yRange = [-50.0, 50.0]
 zRange = [-50.0, 50.0]
 
 ### Setup modules
-testLogic = FiducialRegistrationTestLogic(None)
+testLogic = slicer.modules.FiducialRegistrationTestWidget.logic
 imageMakerCLI = slicer.modules.imagemaker
 
 testLogic.logFilePath = workingDir + '/' + logFileName

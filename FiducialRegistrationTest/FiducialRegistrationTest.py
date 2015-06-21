@@ -148,7 +148,6 @@ class FiducialRegistrationTestWidget(ScriptedLoadableModuleWidget):
     #
     self.referenceSelector = slicer.qMRMLNodeComboBox()
     self.referenceSelector.nodeTypes = ( ("vtkMRMLScalarVolumeNode"), "" )
-    self.referenceSelector.addAttribute( "vtkMRMLScalarVolumeNode", "LabelMap", 0 )
     self.referenceSelector.selectNodeUponCreation = False
     self.referenceSelector.addEnabled = True
     self.referenceSelector.removeEnabled = True
