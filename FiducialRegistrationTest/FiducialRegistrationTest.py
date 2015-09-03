@@ -415,13 +415,15 @@ class FiducialRegistrationTestLogic(ScriptedLoadableModuleLogic):
 
     wtime0 = time.time()
     time0 = time.clock()
-    slicer.cli.run(fiducialDetectionCLI, None, detectionParameters, True)
+    detectionCLINode = slicer.cli.run(fiducialDetectionCLI, None, detectionParameters, True)
     time1 = time.clock()
     wtime1 = time.time()
     t = time1-time0
     wt = wtime1-wtime0
     self.printLog ("Process time for marker detection: %f\n" % t)
     self.printLog ("Wall time for marker detection: %f\n" % wt)
+
+    self.fiducialsDetected = detectionCLINode.GetParameterDefault(4,0)
 
     # Import fiducials in slicer scene
     (success, imageFiducialNode) = slicer.util.loadMarkupsFiducialList(tmpImageFiducialFilename, True)
@@ -436,7 +438,7 @@ class FiducialRegistrationTestLogic(ScriptedLoadableModuleLogic):
     circleFitParameters = {}
     circleFitParameters["movingPoints"] = fiducialNode.GetID()
     circleFitParameters["fixedPoints"] = imageFiducialNode.GetID()
-    circleFitParameters["registration"] = cfTransform.GetID()
+    circleFitParameters["registrationTransform"] = cfTransform.GetID()
 
     wtime0 = time.time()
     time0 = time.clock()
