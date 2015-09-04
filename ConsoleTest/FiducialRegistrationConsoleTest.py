@@ -11,16 +11,19 @@ from slicer.ScriptedLoadableModule import *
 
 
 ### Parameters
-workingDir = "/Users/junichi/Experiments/FiducialTest"
+nFiducials = 6
+noiseLevel = 0.0
+
+workingDir = "/Users/junichi/Experiments/FiducialTest/Test-M%02d-N%1.2f" %(nFiducials, noiseLevel)
+if not os.path.exists(workingDir): os.makedirs(workingDir)
 
 lt = time.localtime()
 logFileName = "log-%04d-%02d-%02d-%02d-%02d-%02d.txt" % (lt.tm_year, lt.tm_mon, lt.tm_mday, lt.tm_hour, lt.tm_min, lt.tm_sec)
 
-nTrialsPerCondition = 2
+nTrialsPerCondition = 5
 
 # Fiducial and volume parameters
 radius = 50
-nFiducials = 6
 imageFOV = 300
 pixelSpacing = 1.0
 thicknessStep = 1.0
@@ -32,6 +35,7 @@ yRange = [-50.0, 50.0]
 zRange = [-50.0, 50.0]
 
 ### Setup modules
+slicer.util.selectModule('FiducialRegistrationTest')
 testLogic = slicer.modules.FiducialRegistrationTestWidget.logic
 imageMakerCLI = slicer.modules.imagemaker
 
@@ -52,7 +56,6 @@ modelFiducialNode = None
 # If the file exists, load it. Otherwise, we generate one.
 if os.path.isfile(workingDir+'/'+modelFiducialNodeName+'.fcsv'):
     (r, modelFiducialNode) = slicer.util.loadMarkupsFiducialList(workingDir+'/'+modelFiducialNodeName+'.fcsv', True)
-    testLogic.configFiducialModel(modelFiducialNode, radius, nFiducials, 20.0)
 else:
     modelFiducialNode = slicer.mrmlScene.CreateNodeByClass("vtkMRMLMarkupsFiducialNode")
     slicer.mrmlScene.AddNode(modelFiducialNode)
@@ -144,6 +147,7 @@ for zRot in numpy.arange(0.0,numpy.pi/2.0+0.001, numpy.pi/36.0): # every 5 degre
         
         slicer.mrmlScene.RemoveNode(randomTransform)
         slicer.mrmlScene.RemoveNode(testFiducialNode)
+        slicer.mrmlScene.RemoveNode(testFiducialVolumeNode)
 
 if testLogic.logFile:
     testLogic.logFile.close()
