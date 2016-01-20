@@ -148,7 +148,6 @@ class FiducialRegistrationTestWidget(ScriptedLoadableModuleWidget):
     #
     self.referenceSelector = slicer.qMRMLNodeComboBox()
     self.referenceSelector.nodeTypes = ( ("vtkMRMLScalarVolumeNode"), "" )
-    self.referenceSelector.addAttribute( "vtkMRMLScalarVolumeNode", "LabelMap", 0 )
     self.referenceSelector.selectNodeUponCreation = False
     self.referenceSelector.addEnabled = True
     self.referenceSelector.removeEnabled = True
@@ -416,13 +415,15 @@ class FiducialRegistrationTestLogic(ScriptedLoadableModuleLogic):
 
     wtime0 = time.time()
     time0 = time.clock()
-    slicer.cli.run(fiducialDetectionCLI, None, detectionParameters, True)
+    detectionCLINode = slicer.cli.run(fiducialDetectionCLI, None, detectionParameters, True)
     time1 = time.clock()
     wtime1 = time.time()
     t = time1-time0
     wt = wtime1-wtime0
     self.printLog ("Process time for marker detection: %f\n" % t)
     self.printLog ("Wall time for marker detection: %f\n" % wt)
+
+    self.fiducialsDetected = detectionCLINode.GetParameterDefault(4,0)
 
     # Import fiducials in slicer scene
     (success, imageFiducialNode) = slicer.util.loadMarkupsFiducialList(tmpImageFiducialFilename, True)
@@ -498,13 +499,13 @@ class FiducialRegistrationTestLogic(ScriptedLoadableModuleLogic):
 
   def evaluateRegistration(self, fiducialNode, testFiducialNode, imageFiducialNode, matrix):
 
-    nFid = fiducialNode.GetNumberOfFiducials()
-
     fle = 0.0
     fre = 0.0
 
     print matrix
 
+    ## FRE
+    nFid = fiducialNode.GetNumberOfFiducials()
     for i in range(0, nFid):
 
       ## Get original fiducial point in the model
@@ -528,28 +529,36 @@ class FiducialRegistrationTestLogic(ScriptedLoadableModuleLogic):
       print a_tfid
       fre = fre + numpy.dot(d_st, d_st)
       
+    fre = numpy.sqrt(fre / nFid)
+
+    ## FLE
+    nFidDetected = imageFiducialNode.GetNumberOfFiducials()
+    for i in range(0, nFidDetected):
+      ifid = [0.0, 0.0, 0.0]
+      imageFiducialNode.GetNthFiducialPosition(i, ifid)
+      a_ifid = numpy.array(ifid)
+
       ## Find nearest point among the detected points
       min_sqfle = numpy.inf
       min_point = [0.0, 0.0, 0.0]
       for j in range(0, nFid):
-        ifid = [0.0, 0.0, 0.0]
-        imageFiducialNode.GetNthFiducialPosition(j, ifid)
-        a_ifid = numpy.array(ifid)
+        sfid = [0.0, 0.0, 0.0]
+        testFiducialNode.GetNthFiducialPosition(j, sfid)
+        a_sfid = numpy.array(sfid)
 
         ## Square FLE
         d_is = a_ifid-a_sfid
         sqfle = numpy.dot(d_is, d_is)
         if sqfle < min_sqfle:
           min_sqfle = sqfle
-
-      ## FLE
+        
       fle = fle + min_sqfle
 
-    fre = numpy.sqrt(fre / nFid)
-    fle = numpy.sqrt(fle / nFid)
+    ## FLE
+    fle = numpy.sqrt(fle / nFidDetected)
 
     if self.logFile:
-      self.logFile.write("FRE/FLE: %f, %f\n" % (fre, fle))
+      self.logFile.write("FRE/FLE/nFidDetected: %f, %f, %d\n" % (fre, fle, nFidDetected))
 
 
   def generateFiducialImage(self, backgroundVolumeNode, outputVolumeNode, fiducialNode):
