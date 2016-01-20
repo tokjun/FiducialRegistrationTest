@@ -382,7 +382,7 @@ class FiducialRegistrationTestLogic(ScriptedLoadableModuleLogic):
   
   def runRegistration(self, fiducialNode, volumeNode, testFiducialNode):
 
-    logging.info('Processing started')
+    #logging.info('Processing started')
 
     # Get CLI modules
     fiducialDetectionCLI = slicer.modules.sphericalfiducialdetection
@@ -390,7 +390,7 @@ class FiducialRegistrationTestLogic(ScriptedLoadableModuleLogic):
 
     # Create temporary filename to store detected fiducials
     tmpImageFiducialFilename = tempfile.NamedTemporaryFile().name + ".fcsv"
-    
+
     # Call fiducial detection
     detectionParameters = {}
     detectionParameters["inputVolume"] = volumeNode.GetID()
@@ -426,6 +426,7 @@ class FiducialRegistrationTestLogic(ScriptedLoadableModuleLogic):
 
     # Import fiducials in slicer scene
     (success, imageFiducialNode) = slicer.util.loadMarkupsFiducialList(tmpImageFiducialFilename, True)
+    print success
     imageFiducialNode.SetName(slicer.mrmlScene.GenerateUniqueName('ImageFiducialsDetected'))
     
     
@@ -437,7 +438,7 @@ class FiducialRegistrationTestLogic(ScriptedLoadableModuleLogic):
     circleFitParameters = {}
     circleFitParameters["movingPoints"] = fiducialNode.GetID()
     circleFitParameters["fixedPoints"] = imageFiducialNode.GetID()
-    circleFitParameters["registration"] = cfTransform.GetID()
+    circleFitParameters["registrationTransform"] = cfTransform.GetID()
 
     wtime0 = time.time()
     time0 = time.clock()
