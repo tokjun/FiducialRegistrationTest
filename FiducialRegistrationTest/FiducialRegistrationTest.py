@@ -387,115 +387,44 @@ class FiducialRegistrationTestLogic(ScriptedLoadableModuleLogic):
     fiducialDetectionCLI = slicer.modules.sphericalfiducialdetection
     circleFitCLI = slicer.modules.circlefit
 
-    # Create temporary filename to store detected fiducials
-    tmpImageFiducialFilename = tempfile.NamedTemporaryFile().name + ".fcsv"
-
-    # Call fiducial detection
-    detectionParameters = {}
-    detectionParameters["inputVolume"] = volumeNode.GetID()
-    detectionParameters["outputFile"] = tmpImageFiducialFilename
-    detectionParameters["threshold"] = 0.0
-    detectionParameters["numberOfSpheres"] = fiducialNode.GetNumberOfFiducials()
-    detectionParameters["sigmaGrad"] = 1.0
-    detectionParameters["gradThreshold"] = 0.1
-    detectionParameters["minRadius"] = 4.0
-    detectionParameters["maxRadius"] = 6.0
-    detectionParameters["variance"] = 1.0
-    detectionParameters["outputThreshold"] = 0.5
-    detectionParameters["sphereRadiusRatio"] = 1.0
-    detectionParameters["alpha"] = 0.8
-    detectionParameters["beta"] = 0.8
-    detectionParameters["gamma"] = 0.8
-
-    detectionParameters["minSigma"] = 3.0
-    detectionParameters["maxSigma"] = 3.0
-    detectionParameters["stepSigma"] = 1.0
-    
-    detectionParameters["debugSwitch"] = 0
-
-    wtime0 = time.time()
-    time0 = time.clock()
-    detectionCLINode = slicer.cli.run(fiducialDetectionCLI, None, detectionParameters, True)
-    time1 = time.clock()
-    wtime1 = time.time()
-    t = time1-time0
-    wt = wtime1-wtime0
-    self.printLog ("Process time for marker detection: %f\n" % t)
-    self.printLog ("Wall time for marker detection: %f\n" % wt)
-
-    self.fiducialsDetected = detectionCLINode.GetParameterDefault(4,0)
-
-    # Import fiducials in slicer scene
-    (success, imageFiducialNode) = slicer.util.loadMarkupsFiducialList(tmpImageFiducialFilename, True)
-    print success
-    imageFiducialNode.SetName(slicer.mrmlScene.GenerateUniqueName('ImageFiducialsDetected'))
-    
-    
-    #### Circle Fitting
-
     cfTransform = slicer.mrmlScene.CreateNodeByClass("vtkMRMLLinearTransformNode")
     slicer.mrmlScene.AddNode(cfTransform)
 
-    circleFitParameters = {}
-    circleFitParameters["movingPoints"] = fiducialNode.GetID()
-    circleFitParameters["fixedPoints"] = imageFiducialNode.GetID()
-    circleFitParameters["registrationTransform"] = cfTransform.GetID()
-
-    wtime0 = time.time()
-    time0 = time.clock()
-    slicer.cli.run(circleFitCLI, None, circleFitParameters, True)
-    time1 = time.clock()
-    wtime1 = time.time()
-
-    matrix = vtk.vtkMatrix4x4()
-    cfTransform.GetMatrixTransformToParent(matrix)
-    self.printMatrixInLine("CircleFit", matrix)
-
-    t = time1-time0
-    wt = wtime1-wtime0
-    self.printLog ("Process time for CircleFit: %f\n" % t)
-    self.printLog ("Wall time for CircleFit: %f\n" % wt)
-
-    self.evaluateRegistration(fiducialNode, testFiducialNode, imageFiducialNode, matrix)
+    # Register
+    slicer.modules.mrrobotregistration.widgetRepresentation()
+    reg = slicer.modules.MRRobotRegistrationWidget
+    reg.volumeSelector.setCurrentNode(volumeNode)
+    reg.fiducialSelector.setCurrentNode(fiducialNode)
+    reg.transformSelector.setCurrentNode(cfTransform)
+    reg.circleFitBox.setChecked(True)
+    reg.icpBox.setChecked(False)
     
+    if reg.applyButton.enabled == True:
+      reg.onApplyButton()
+
+    #return reg.fiducialDetectedBox.text, reg.outliersDetectedBox.text, reg.registrationError.text, (end-start), registrationMatrix.GetName(), registrationMatrix.GetID()    
+
+    if reg.logic:
+      self.printLog ("Process time for marker detection: %f\n" % reg.logic.procTimeDetection)
+      self.printLog ("Wall time for marker detection: %f\n" % reg.logic.wallTimeDetection)
+      
+      self.printLog ("Process time for CircleFit: %f\n" % reg.logic.procTimeCircleFit)
+      self.printLog ("Wall time for CircleFit: %f\n" % reg.logic.wallTimeCircleFit)
+
+      # Get matrix for the result
+      matrix = vtk.vtkMatrix4x4()
+      cfTransform.GetMatrixTransformToParent(matrix)
+      self.printMatrixInLine("CircleFit", matrix)
+      
+      # Import detected fiducials in slicer scene
+      (success, imageFiducialNode) = slicer.util.loadMarkupsFiducialList(reg.logic.tmpImageFiducialFilename, True)
+      if success:
+        imageFiducialNode.SetName(slicer.mrmlScene.GenerateUniqueName('ImageFiducialsDetected'))
+        self.evaluateRegistration(fiducialNode, testFiducialNode, imageFiducialNode, matrix)
+        slicer.mrmlScene.RemoveNode(imageFiducialNode)
+      
     slicer.mrmlScene.RemoveNode(cfTransform)
 
-    ##### ICP
-    #
-    #initialTransform = slicer.mrmlScene.CreateNodeByClass("vtkMRMLLinearTransformNode")
-    #slicer.mrmlScene.AddNode(initialTransform)
-    #
-    #icpRegistrationCLI = slicer.modules.icpregistration
-    #
-    #icpTransform = slicer.mrmlScene.CreateNodeByClass("vtkMRMLLinearTransformNode")
-    #slicer.mrmlScene.AddNode(icpTransform)
-    #
-    #icpRegistrationError = 0.0
-    #registrationParameters = {}
-    #registrationParameters["movingPoints"] = fiducialNode.GetID()
-    #registrationParameters["fixedPoints"] = imageFiducialNode.GetID()
-    #registrationParameters["initialTransform"] = initialTransform.GetID()
-    #registrationParameters["registrationTransform"] = icpTransform.GetID()
-    #
-    #registrationParameters["iterations"] = 2000
-    #registrationParameters["gradientTolerance"] = 0.0001
-    #registrationParameters["valueTolerance"] = 0.0001
-    #registrationParameters["epsilonFunction"] = 0.00001
-    #
-    #time0 = time.clock()
-    #cliNode = slicer.cli.run(icpRegistrationCLI, None, registrationParameters, True)
-    #time1 = time.clock()
-    #
-    #icpTransform.GetMatrixTransformToParent(matrix)
-    #self.printMatrixInLine("ICP", matrix)
-    #t = time1-time0
-    #self.printLog ("Time - ICP: %f\n" % t)
-    #
-    ##self.evaluateRegistration(fiducialNode, testFiducialNode, imageFiducialNode, matrix)
-    #
-    ## Cleanup
-    #slicer.mrmlScene.RemoveNode(icpTransform)
-    
 
   def evaluateRegistration(self, fiducialNode, testFiducialNode, imageFiducialNode, matrix):
 
