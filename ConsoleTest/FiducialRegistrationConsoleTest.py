@@ -14,6 +14,7 @@ from slicer.ScriptedLoadableModule import *
 
 
 def generateModel(modelFiducialName, radius, nFiducials, workingDir):
+
     modelFiducialNode = None
 
     # If the file exists, load it. Otherwise, we generate one.
@@ -31,22 +32,50 @@ def generateModel(modelFiducialName, radius, nFiducials, workingDir):
 
 # Generate a random transform. If the transform already exists in the working directory,
 # the function will load it to the scene.
-def generateRandomTransform(randomMatrix, randomTransformName, workingDir):
+def generateRandomTransform(randomMatrix, randomTransformName, workingDir, imageFOV, dummyFiducialNode):
     
     randomTransform = None
+    rangeOffset = 10.0
+
+    xRange = [-imageFOV[0]/2.0+rangeOffset, imageFOV[0]/2.0-rangeOffset]
+    yRange = [-imageFOV[1]/2.0+rangeOffset, imageFOV[1]/2.0-rangeOffset]
+    zRange = [-imageFOV[2]/2.0+rangeOffset, imageFOV[2]/2.0-rangeOffset]
+
+    # Dummy fiducial for checking the range
+    nFid = dummyFiducialNode.GetNumberOfFiducials()
     
     if os.path.isfile(workingDir+'/'+randomTransformName+'.h5'):
         (r, randomTransform) = slicer.util.loadTransform(workingDir+'/'+randomTransformName+'.h5', True)
         randomTransform.GetMatrixTransformToParent(randomMatrix)
         slicer.mrmlScene.RemoveNode(randomTransform)
     else:
-        testLogic.generateRandomTransform(xRange, yRange, zRange, randomMatrix)
-        randomTransform = slicer.mrmlScene.CreateNodeByClass("vtkMRMLLinearTransformNode")
-        randomTransform.SetMatrixTransformToParent(randomMatrix)
-        slicer.mrmlScene.AddNode(randomTransform)
-        randomTransform.SetName(randomTransformName)
-        slicer.util.saveNode(randomTransform, workingDir+'/'+randomTransformName+'.h5')
-        slicer.mrmlScene.RemoveNode(randomTransform)
+        fFound = False
+        while fFound == False:
+            testLogic.generateRandomTransform(xRange, yRange, zRange, randomMatrix)
+
+            # Check range
+            fOutOfRange = False
+            for m in range(0, nFid):
+                pos = [0.0, 0.0, 0.0]
+                tpos = [0.0, 0.0, 0.0, 1.0]
+                dummyFiducialNode.GetNthFiducialPosition(m, pos)
+                pos.append(1.0)
+                randomMatrix.MultiplyPoint(pos, tpos)
+                if (tpos[0] < xRange[0]) or (tpos[0] > xRange[1]) or (tpos[1] < yRange[0]) or (tpos[1] > yRange[1]) or (tpos[2] < zRange[0]) or (tpos[2] > zRange[1]):
+                    fOutOfRange = True
+
+            if fOutOfRange == False:
+                print "Found random transform."
+                randomTransform = slicer.mrmlScene.CreateNodeByClass("vtkMRMLLinearTransformNode")
+                randomTransform.SetMatrixTransformToParent(randomMatrix)
+                slicer.mrmlScene.AddNode(randomTransform)
+                randomTransform.SetName(randomTransformName)
+                slicer.util.saveNode(randomTransform, workingDir+'/'+randomTransformName+'.h5')
+                slicer.mrmlScene.RemoveNode(randomTransform)
+                fFound = True
+            else:
+                print "Random transform out of range."
+        
 
 def generateTestFiducial(modelFiducialNode, randomMatrix):
 
@@ -141,10 +170,10 @@ if not os.path.exists(workingDir): os.makedirs(workingDir)
 logFileName = "log-%04d-%02d-%02d-%02d-%02d-%02d.txt" % (lt.tm_year, lt.tm_mon, lt.tm_mday, lt.tm_hour, lt.tm_min, lt.tm_sec)
 csvFileName = "result-%04d-%02d-%02d-%02d-%02d-%02d.csv" % (lt.tm_year, lt.tm_mon, lt.tm_mday, lt.tm_hour, lt.tm_min, lt.tm_sec)
 
-nTrialsPerCondition = 5
+nTrialsPerCondition = 1
 
 # Fiducial and volume parameters
-radius = 50
+radius = 92
 imageFOV = [300, 255, 150]
 pixelSpacing = 0.9375
 thicknessStep = 1.0
@@ -152,7 +181,7 @@ nThicknessSteps = 4
 
 # Range for random transform
 xRange = [-50.0, 50.0]
-yRange = [-50.0, 50.0]
+yRange = [-36.0, 36.0]
 zRange = [-20.0, 20.0]
 
 ### Setup modules
@@ -171,58 +200,116 @@ csvFile = open(csvFilePath, 'a')
 csvFile.write('nFiducials, Thickness, Noise, Trial, FRE, FLE, TRE, Nfid\n')
 
 
+### Dummy fiducial to check the range
+dummyFiducialNode = generateModel('DummyFiducialFrame', radius, 20, workingDir)
+
 ### Generate transform
 randomMatrix = vtk.vtkMatrix4x4()
 
+## Three comparisons:
+##  1. Noise vs Number of fiducials (slice thickness = 2.0mm)
+##  2. Slice thickness vs number of fiducials (noise = 0.2)
+##  3. Noise vs Slice thickness  (number of fiducils = 8)
 
 for trial in range(0, nTrialsPerCondition):
 
     randomTransformName = "TestRandomTransform-%03d" % (trial)
-    generateRandomTransform(randomMatrix, randomTransformName, workingDir)
-    
-    ### Prepare fiducial models
+    generateRandomTransform(randomMatrix, randomTransformName, workingDir, imageFOV, dummyFiducialNode)
+
     for nFiducials in range (5, 10):
-        ### Generate a fiducial model
+
+        ### Generate or load a fiducial model
         modelFiducialName = "Model-Fiducial-%d-%d-%03d" % (radius, nFiducials, trial)
         modelFiducialNode = generateModel(modelFiducialName, radius, nFiducials, workingDir)
-
-    for nFiducials in range (5, 10):
-
         testFiducialNode = generateTestFiducial(modelFiducialNode, randomMatrix)
-        modelFiducialName = "Model-Fiducial-%d-%d" % (radius, nFiducials)        
-        if os.path.isfile(workingDir+'/'+modelFiducialName+'.fcsv'):
-            (r, modelFiducialNode) = slicer.util.loadMarkupsFiducialList(workingDir+'/'+modelFiducialName+'.fcsv', True)
 
-        ## Number of fiducials Noise level
+        thickness = 2.0
+
+        ## 1. Noise vs Number of fiducials (Silce thickness = 2.0 mm)
+        testVolumeName = "TestImage-thickness-%02d-%d-%03d" % (nFiducials, thickness, trial)
+        testVolumeNode = generateTestVolume(testFiducialNode, imageFOV, pixelSpacing, thickness, workingDir)
+
+        for noise in numpy.arange(0.0, 0.6, 0.1):
+            
+            testLogic.printLog("Console Test > %d, %d, %f , %f\n" % (nFiducials, trial, thickness, noise))
+                
+            ## Default voxel value is 100
+            sd = 100.0 * noise
+            noiseVolumeNodeName = "NoiseImage"
+            addGaussianNoise(testVolumeNode, noiseVolumeNodeName, sd, 0.0)
+            noiseVolumeNode = slicer.util.getNode(noiseVolumeNodeName)
+        
+            resultMatrix = vtk.vtkMatrix4x4()
+            (fre, fle, nFidDetected) = testLogic.runRegistration(modelFiducialNode, noiseVolumeNode, testFiducialNode, resultMatrix)
+                
+            tre = computeEstimatedTRE(randomMatrix, resultMatrix, 150)
+            csvFile.write('%d, %f, %f, %d, %f, %f, %f, %d\n' % (nFiducials, thickness, noise, trial, fre, fle, tre, nFidDetected))
+                
+            slicer.mrmlScene.RemoveNode(noiseVolumeNode)
+
+        slicer.mrmlScene.RemoveNode(testVolumeNode)
+        
+        ## 2. Slice thickness vs Number of fiducials (Noise = 0.2)
+        noise = 0.2
+        
         for thickness in numpy.arange(1.0, thicknessStep*nThicknessSteps+0.001, thicknessStep):
-
+            
+            testLogic.printLog("Console Test > %d, %d, %f , %f\n" % (nFiducials, trial, thickness, noise))
+            
             testVolumeName = "TestImage-thickness-%02d-%d-%03d" % (nFiducials, thickness, trial)
             testVolumeNode = generateTestVolume(testFiducialNode, imageFOV, pixelSpacing, thickness, workingDir)
-        
-            for noise in numpy.arange(0.0, 0.6, 0.1):
             
-                testLogic.printLog("Console Test > %d, %d, %f , %f\n" % (nFiducials, trial, thickness, noise))
+            ## Default voxel value is 100
+            sd = 100.0 * noise
+            noiseVolumeNodeName = "NoiseImage"
+            addGaussianNoise(testVolumeNode, noiseVolumeNodeName, sd, 0.0)
+            noiseVolumeNode = slicer.util.getNode(noiseVolumeNodeName)
                 
-                ## Default voxel value is 100
-                sd = 100.0 * noise
-                noiseVolumeNodeName = "NoiseImage"
-                addGaussianNoise(testVolumeNode, noiseVolumeNodeName, sd, 0.0)
-                noiseVolumeNode = slicer.util.getNode(noiseVolumeNodeName)
+            resultMatrix = vtk.vtkMatrix4x4()
+            (fre, fle, nFidDetected) = testLogic.runRegistration(modelFiducialNode, noiseVolumeNode, testFiducialNode, resultMatrix)
                 
-                resultMatrix = vtk.vtkMatrix4x4()
-                (fre, fle, nFidDetected) = testLogic.runRegistration(modelFiducialNode, noiseVolumeNode, testFiducialNode, resultMatrix)
-                
-            
-                tre = computeEstimatedTRE(randomMatrix, resultMatrix, 150)
-                csvFile.write('%d, %f, %f, %d, %f, %f, %f, %d\n' % (nFiducials, thickness, noise, trial, fre, fle, tre, nFidDetected))
-                
-                slicer.mrmlScene.RemoveNode(noiseVolumeNode)
+            tre = computeEstimatedTRE(randomMatrix, resultMatrix, 150)
+            csvFile.write('%d, %f, %f, %d, %f, %f, %f, %d\n' % (nFiducials, thickness, noise, trial, fre, fle, tre, nFidDetected))
 
             slicer.mrmlScene.RemoveNode(testVolumeNode)
+            slicer.mrmlScene.RemoveNode(noiseVolumeNode)
 
         slicer.mrmlScene.RemoveNode(modelFiducialNode)
         slicer.mrmlScene.RemoveNode(testFiducialNode)
+
         
+    ##  3. Noise vs Slice thickness  (number of fiducils = 8)
+    nFiducials = 8
+    modelFiducialName = "Model-Fiducial-%d-%d-%03d" % (radius, nFiducials, trial)
+    modelFiducialNode = generateModel(modelFiducialName, radius, nFiducials, workingDir)
+    testFiducialNode = generateTestFiducial(modelFiducialNode, randomMatrix)
+    
+    for thickness in numpy.arange(1.0, thicknessStep*nThicknessSteps+0.001, thicknessStep):
+        
+        testVolumeName = "TestImage-thickness-%02d-%d-%03d" % (nFiducials, thickness, trial)
+        testVolumeNode = generateTestVolume(testFiducialNode, imageFOV, pixelSpacing, thickness, workingDir)
+
+        for noise in numpy.arange(0.0, 0.6, 0.1):
+            testLogic.printLog("Console Test > %d, %d, %f , %f\n" % (nFiducials, trial, thickness, noise))
+                    
+            ## Default voxel value is 100
+            sd = 100.0 * noise
+            noiseVolumeNodeName = "NoiseImage"
+            addGaussianNoise(testVolumeNode, noiseVolumeNodeName, sd, 0.0)
+            noiseVolumeNode = slicer.util.getNode(noiseVolumeNodeName)
+            
+            resultMatrix = vtk.vtkMatrix4x4()
+            (fre, fle, nFidDetected) = testLogic.runRegistration(modelFiducialNode, noiseVolumeNode, testFiducialNode, resultMatrix)
+        
+            tre = computeEstimatedTRE(randomMatrix, resultMatrix, 150)
+            csvFile.write('%d, %f, %f, %d, %f, %f, %f, %d\n' % (nFiducials, thickness, noise, trial, fre, fle, tre, nFidDetected))
+            
+            slicer.mrmlScene.RemoveNode(noiseVolumeNode)
+        
+        slicer.mrmlScene.RemoveNode(testVolumeNode)
+
+
+slicer.mrmlScene.RemoveNode(dummyFiducialNode)
 
 if testLogic.logFile:
     testLogic.logFile.close()
