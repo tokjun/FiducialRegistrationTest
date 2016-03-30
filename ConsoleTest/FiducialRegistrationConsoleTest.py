@@ -98,15 +98,34 @@ def generateTestVolume(testFiducialNode, imageFOV, pixelSpacing, thickness, work
     return testVolumeNode
 
 
+def computeEstimatedTRE(referenceMatrix, resultMatrix, needleLength):
+
+    tipOffset = [0.0, 0.0, -needleLength, 1.0]
+    referenceTipPos = [0.0, 0.0, 0.0, 1.0]
+    registeredTipPos= [0.0, 0.0, 0.0, 1.0]
+
+    referenceMatrix.MultiplyPoint(tipOffset, referenceTipPos)
+    resultMatrix.MultiplyPoint(tipOffset, registeredTipPos)
+
+    npReferenceTipPos = numpy.array(referenceTipPos[0:3])
+    npRegisteredTipPos = numpy.array(registeredTipPos[0:3])
+
+    errorVector = npReferenceTipPos - npRegisteredTipPos
+
+    return numpy.linalg.norm(errorVector)
+
+
 ### Parameters
 nFiducials = 6
 noiseLevel = 0.0
 
-workingDir = "/Users/junichi/Experiments/FiducialTest/Test-M%02d-N%1.2f" %(nFiducials, noiseLevel)
+#workingDir = "/Users/junichi/Experiments/FiducialTest/Test-M%02d-N%1.2f" %(nFiducials, noiseLevel)
+workingDir = "/home/develop/Dropbox/Experiments/Canon/FiducialTest/Test-M%02d-N%1.2f" %(nFiducials, noiseLevel)
 if not os.path.exists(workingDir): os.makedirs(workingDir)
 
 lt = time.localtime()
 logFileName = "log-%04d-%02d-%02d-%02d-%02d-%02d.txt" % (lt.tm_year, lt.tm_mon, lt.tm_mday, lt.tm_hour, lt.tm_min, lt.tm_sec)
+csvFileName = "result-%04d-%02d-%02d-%02d-%02d-%02d.csv" % (lt.tm_year, lt.tm_mon, lt.tm_mday, lt.tm_hour, lt.tm_min, lt.tm_sec)
 
 nTrialsPerCondition = 5
 
@@ -132,13 +151,17 @@ testLogic.logFile = open(testLogic.logFilePath, 'a')
 
 testLogic.printLog("Console Test > trial, thickness \n")
 
+csvFilePath = workingDir + '/' + csvFileName
+csvFile = open(csvFilePath, 'a')
+
+csvFile.write('thickness, trial, fre, fle, tre, nFid')
+
 ### Generate a fiducial model
 modelFiducialName = "Model-Fiducial-%d-%d" % (radius, nFiducials)
 modelFiducialNode = generateModel(modelFiducialName, radius, nFiducials, workingDir)
 
 ### Generate transform
 randomMatrix = vtk.vtkMatrix4x4()
-
 
 for trial in range(0, nTrialsPerCondition):
 
@@ -151,18 +174,23 @@ for trial in range(0, nTrialsPerCondition):
 
         testVolumeName = "TestImage-thickness-%d-%03d" % (thickness, trial)
         testVolumeNode = generateTestVolume(testFiducialNode, imageFOV, pixelSpacing, thickness, workingDir)
-        
+
         testLogic.printLog("Console Test > %d, %f \n" % (trial, thickness))
-        (fre, fle, nFidDetectd) = testLogic.runRegistration(modelFiducialNode, testVolumeNode, testFiducialNode)
-        
+
+        resultMatrix = vtk.vtkMatrix4x4()
+        (fre, fle, nFidDetected) = testLogic.runRegistration(modelFiducialNode, testVolumeNode, testFiducialNode, resultMatrix)
+
+        tre = computeEstimatedTRE(randomMatrix, resultMatrix, 150)
+        csvFile.write('%f, %d, %f, %f, %f, %d\n' % (thickness, trial, fre, fle, tre, nFidDetected))
+
         slicer.mrmlScene.RemoveNode(testVolumeNode)
         
     slicer.mrmlScene.RemoveNode(testFiducialNode)
         
-
 slicer.mrmlScene.RemoveNode(modelFiducialNode)
 
 if testLogic.logFile:
     testLogic.logFile.close()
 
-
+if csvFile:
+    csvFile.close()

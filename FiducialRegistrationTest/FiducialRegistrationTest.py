@@ -378,8 +378,9 @@ class FiducialRegistrationTestLogic(ScriptedLoadableModuleLogic):
       return False
     return True
 
-  
-  def runRegistration(self, fiducialNode, volumeNode, testFiducialNode):
+      
+  def runRegistration(self, fiducialNode, volumeNode, testFiducialNode, matrix=None):
+    ## If 'matrix' is specified, the registration result will be stored in matrix
 
     #logging.info('Processing started')
 
@@ -416,7 +417,8 @@ class FiducialRegistrationTestLogic(ScriptedLoadableModuleLogic):
       self.printLog ("Wall time for CircleFit: %f\n" % reg.logic.wallTimeCircleFit)
 
       # Get matrix for the result
-      matrix = vtk.vtkMatrix4x4()
+      if matrix==None:
+        matrix = vtk.vtkMatrix4x4()
       cfTransform.GetMatrixTransformToParent(matrix)
       self.printMatrixInLine("CircleFit", matrix)
       
