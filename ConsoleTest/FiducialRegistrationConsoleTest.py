@@ -6,8 +6,11 @@ import math
 import tempfile
 import time
 import numpy
+import SimpleITK as sitk
+import sitkUtils
 from __main__ import vtk, qt, ctk, slicer
 from slicer.ScriptedLoadableModule import *
+
 
 
 def generateModel(modelFiducialName, radius, nFiducials, workingDir):
@@ -84,6 +87,7 @@ def generateTestVolume(testFiducialNode, imageFOV, pixelSpacing, thickness, work
         imageMakerParameters["Origin"] = [-imageFOV[0]/2.0, -imageFOV[1]/2.0, -imageFOV[2]/2.0]
         imageMakerParameters["Spacing"] = [pixelSpacing, pixelSpacing, thickness]
         imageMakerParameters["Direction"] = [1.00, 0.00, 0.00, 0.00, 1.00, 0.00, 0.00, 0.00, 1.00]
+        imageMakerParameters["defaultVoxelValue"] = 100
         
         slicer.cli.run(imageMakerCLI, None, imageMakerParameters, True)
         
@@ -96,6 +100,19 @@ def generateTestVolume(testFiducialNode, imageFOV, pixelSpacing, thickness, work
         slicer.mrmlScene.RemoveNode(templateVolumeNode)
 
     return testVolumeNode
+
+
+def addGaussianNoise(inputImageNode, outputImageNodeName, sd, mean):
+    
+    input  = sitk.Cast(sitkUtils.PullFromSlicer(inputImageNode.GetID()), sitk.sitkUInt16)
+
+    noiseFilter = sitk.AdditiveGaussianNoiseImageFilter()
+    noiseFilter.SetDebug(False)
+    noiseFilter.SetMean(mean)
+    noiseFilter.SetSeed(0)
+    noiseFilter.SetStandardDeviation(sd)
+    output = noiseFilter.Execute(input)
+    sitkUtils.PushToSlicer(output, outputImageNodeName, 0, True)
 
 
 def computeEstimatedTRE(referenceMatrix, resultMatrix, needleLength):
@@ -116,14 +133,11 @@ def computeEstimatedTRE(referenceMatrix, resultMatrix, needleLength):
 
 
 ### Parameters
-nFiducials = 6
-noiseLevel = 0.0
+lt = time.localtime()
 
-#workingDir = "/Users/junichi/Experiments/FiducialTest/Test-M%02d-N%1.2f" %(nFiducials, noiseLevel)
-workingDir = "/home/develop/Dropbox/Experiments/Canon/FiducialTest/Test-M%02d-N%1.2f" %(nFiducials, noiseLevel)
+workingDir = "/Users/junichi/Experiments/FiducialTest/Test-%04d-%02d-%02d-%02d-%02d-%02d" % (lt.tm_year, lt.tm_mon, lt.tm_mday, lt.tm_hour, lt.tm_min, lt.tm_sec)
 if not os.path.exists(workingDir): os.makedirs(workingDir)
 
-lt = time.localtime()
 logFileName = "log-%04d-%02d-%02d-%02d-%02d-%02d.txt" % (lt.tm_year, lt.tm_mon, lt.tm_mday, lt.tm_hour, lt.tm_min, lt.tm_sec)
 csvFileName = "result-%04d-%02d-%02d-%02d-%02d-%02d.csv" % (lt.tm_year, lt.tm_mon, lt.tm_mday, lt.tm_hour, lt.tm_min, lt.tm_sec)
 
@@ -132,7 +146,7 @@ nTrialsPerCondition = 5
 # Fiducial and volume parameters
 radius = 50
 imageFOV = [300, 255, 150]
-pixelSpacing = 1.0
+pixelSpacing = 0.9375
 thicknessStep = 1.0
 nThicknessSteps = 4
 
@@ -154,40 +168,61 @@ testLogic.printLog("Console Test > trial, thickness \n")
 csvFilePath = workingDir + '/' + csvFileName
 csvFile = open(csvFilePath, 'a')
 
-csvFile.write('thickness, trial, fre, fle, tre, nFid')
+csvFile.write('nFiducials, Thickness, Noise, Trial, FRE, FLE, TRE, Nfid\n')
 
-### Generate a fiducial model
-modelFiducialName = "Model-Fiducial-%d-%d" % (radius, nFiducials)
-modelFiducialNode = generateModel(modelFiducialName, radius, nFiducials, workingDir)
 
 ### Generate transform
 randomMatrix = vtk.vtkMatrix4x4()
+
 
 for trial in range(0, nTrialsPerCondition):
 
     randomTransformName = "TestRandomTransform-%03d" % (trial)
     generateRandomTransform(randomMatrix, randomTransformName, workingDir)
-
-    testFiducialNode = generateTestFiducial(modelFiducialNode, randomMatrix)
     
-    for thickness in numpy.arange(1.0, thicknessStep*nThicknessSteps+0.001, thicknessStep):
+    ### Prepare fiducial models
+    for nFiducials in range (5, 10):
+        ### Generate a fiducial model
+        modelFiducialName = "Model-Fiducial-%d-%d-%03d" % (radius, nFiducials, trial)
+        modelFiducialNode = generateModel(modelFiducialName, radius, nFiducials, workingDir)
 
-        testVolumeName = "TestImage-thickness-%d-%03d" % (thickness, trial)
-        testVolumeNode = generateTestVolume(testFiducialNode, imageFOV, pixelSpacing, thickness, workingDir)
+    for nFiducials in range (5, 10):
 
-        testLogic.printLog("Console Test > %d, %f \n" % (trial, thickness))
+        testFiducialNode = generateTestFiducial(modelFiducialNode, randomMatrix)
+        modelFiducialName = "Model-Fiducial-%d-%d" % (radius, nFiducials)        
+        if os.path.isfile(workingDir+'/'+modelFiducialName+'.fcsv'):
+            (r, modelFiducialNode) = slicer.util.loadMarkupsFiducialList(workingDir+'/'+modelFiducialName+'.fcsv', True)
 
-        resultMatrix = vtk.vtkMatrix4x4()
-        (fre, fle, nFidDetected) = testLogic.runRegistration(modelFiducialNode, testVolumeNode, testFiducialNode, resultMatrix)
+        ## Number of fiducials Noise level
+        for thickness in numpy.arange(1.0, thicknessStep*nThicknessSteps+0.001, thicknessStep):
 
-        tre = computeEstimatedTRE(randomMatrix, resultMatrix, 150)
-        csvFile.write('%f, %d, %f, %f, %f, %d\n' % (thickness, trial, fre, fle, tre, nFidDetected))
-
-        slicer.mrmlScene.RemoveNode(testVolumeNode)
+            testVolumeName = "TestImage-thickness-%02d-%d-%03d" % (nFiducials, thickness, trial)
+            testVolumeNode = generateTestVolume(testFiducialNode, imageFOV, pixelSpacing, thickness, workingDir)
         
-    slicer.mrmlScene.RemoveNode(testFiducialNode)
+            for noise in numpy.arange(0.0, 0.6, 0.1):
+            
+                testLogic.printLog("Console Test > %d, %d, %f , %f\n" % (nFiducials, trial, thickness, noise))
+                
+                ## Default voxel value is 100
+                sd = 100.0 * noise
+                noiseVolumeNodeName = "NoiseImage"
+                addGaussianNoise(testVolumeNode, noiseVolumeNodeName, sd, 0.0)
+                noiseVolumeNode = slicer.util.getNode(noiseVolumeNodeName)
+                
+                resultMatrix = vtk.vtkMatrix4x4()
+                (fre, fle, nFidDetected) = testLogic.runRegistration(modelFiducialNode, noiseVolumeNode, testFiducialNode, resultMatrix)
+                
+            
+                tre = computeEstimatedTRE(randomMatrix, resultMatrix, 150)
+                csvFile.write('%d, %f, %f, %d, %f, %f, %f, %d\n' % (nFiducials, thickness, noise, trial, fre, fle, tre, nFidDetected))
+                
+                slicer.mrmlScene.RemoveNode(noiseVolumeNode)
+
+            slicer.mrmlScene.RemoveNode(testVolumeNode)
+
+        slicer.mrmlScene.RemoveNode(modelFiducialNode)
+        slicer.mrmlScene.RemoveNode(testFiducialNode)
         
-slicer.mrmlScene.RemoveNode(modelFiducialNode)
 
 if testLogic.logFile:
     testLogic.logFile.close()
