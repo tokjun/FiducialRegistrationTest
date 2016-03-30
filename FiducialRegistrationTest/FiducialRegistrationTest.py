@@ -402,7 +402,11 @@ class FiducialRegistrationTestLogic(ScriptedLoadableModuleLogic):
     if reg.applyButton.enabled == True:
       reg.onApplyButton()
 
-    #return reg.fiducialDetectedBox.text, reg.outliersDetectedBox.text, reg.registrationError.text, (end-start), registrationMatrix.GetName(), registrationMatrix.GetID()    
+    #return reg.fiducialDetectedBox.text, reg.outliersDetectedBox.text, reg.registrationError.text, (end-start), registrationMatrix.GetName(), registrationMatrix.GetID()
+
+    fre = None
+    fle = None
+    nFidDetected = None
 
     if reg.logic:
       self.printLog ("Process time for marker detection: %f\n" % reg.logic.procTimeDetection)
@@ -420,11 +424,11 @@ class FiducialRegistrationTestLogic(ScriptedLoadableModuleLogic):
       (success, imageFiducialNode) = slicer.util.loadMarkupsFiducialList(reg.logic.tmpImageFiducialFilename, True)
       if success:
         imageFiducialNode.SetName(slicer.mrmlScene.GenerateUniqueName('ImageFiducialsDetected'))
-        self.evaluateRegistration(fiducialNode, testFiducialNode, imageFiducialNode, matrix)
+        (fre, fle, nFidDetected) =  self.evaluateRegistration(fiducialNode, testFiducialNode, imageFiducialNode, matrix)
         slicer.mrmlScene.RemoveNode(imageFiducialNode)
       
     slicer.mrmlScene.RemoveNode(cfTransform)
-
+    return (fre, fle, nFidDetected)
 
   def evaluateRegistration(self, fiducialNode, testFiducialNode, imageFiducialNode, matrix):
 
@@ -489,6 +493,8 @@ class FiducialRegistrationTestLogic(ScriptedLoadableModuleLogic):
     if self.logFile:
       self.logFile.write("FRE/FLE/nFidDetected: %f, %f, %d\n" % (fre, fle, nFidDetected))
 
+    return (fre, fle, nFidDetected)
+      
 
   def generateFiducialImage(self, backgroundVolumeNode, outputVolumeNode, fiducialNode):
 
