@@ -428,9 +428,12 @@ class FiducialRegistrationTestLogic(ScriptedLoadableModuleLogic):
         imageFiducialNode.SetName(slicer.mrmlScene.GenerateUniqueName('ImageFiducialsDetected'))
         (fre, fle, nFidDetected) =  self.evaluateRegistration(fiducialNode, testFiducialNode, imageFiducialNode, matrix)
         slicer.mrmlScene.RemoveNode(imageFiducialNode)
+
+      totalProcTime = reg.logic.procTimeDetection + reg.logic.procTimeCircleFit
+      totalWallTime = reg.logic.wallTimeDetection + reg.logic.wallTimeCircleFit
       
     slicer.mrmlScene.RemoveNode(cfTransform)
-    return (fre, fle, nFidDetected)
+    return (fre, fle, nFidDetected, totalProcTime, totalWallTime)
 
   def evaluateRegistration(self, fiducialNode, testFiducialNode, imageFiducialNode, matrix):
 

@@ -2,7 +2,8 @@ library(ggplot2)
 
 dateString <- '2016-03-30-18-10-20'
 
-setwd(sprintf('/home/develop/Dropbox/Experiments/Canon/FiducialTest/Test-%s', dateString))
+#setwd(sprintf('/home/develop/Dropbox/Experiments/Canon/FiducialTest/Test-%s', dateString))
+setwd(sprintf('/Users/junichi/Dropbox/Experiments/Canon/FiducialTest/Test-%s', dateString))
 data <- read.csv(sprintf('result-%s.csv', dateString))
 
 ## xstr, bystr, condstr correspond to y-axis, x-axis, and individual line in the final plot

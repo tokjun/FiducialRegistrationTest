@@ -169,7 +169,7 @@ if not os.path.exists(workingDir): os.makedirs(workingDir)
 logFileName = "log-%04d-%02d-%02d-%02d-%02d-%02d.txt" % (lt.tm_year, lt.tm_mon, lt.tm_mday, lt.tm_hour, lt.tm_min, lt.tm_sec)
 csvFileName = "result-%04d-%02d-%02d-%02d-%02d-%02d.csv" % (lt.tm_year, lt.tm_mon, lt.tm_mday, lt.tm_hour, lt.tm_min, lt.tm_sec)
 
-nTrialsPerCondition = 1
+nTrialsPerCondition = 10
 
 # Fiducial and volume parameters
 radius = 92
@@ -196,7 +196,7 @@ testLogic.printLog("Console Test > trial, thickness \n")
 csvFilePath = workingDir + '/' + csvFileName
 csvFile = open(csvFilePath, 'a')
 
-csvFile.write('nFiducials, Thickness, Noise, Trial, FRE, FLE, TRE, Nfid\n')
+csvFile.write('nFiducials, Thickness, Noise, Trial, FRE, FLE, TRE, Nfid, ProcTime, WallTime\n')
 
 
 ### Dummy fiducial to check the range
@@ -239,10 +239,10 @@ for trial in range(0, nTrialsPerCondition):
             noiseVolumeNode = slicer.util.getNode(noiseVolumeNodeName)
         
             resultMatrix = vtk.vtkMatrix4x4()
-            (fre, fle, nFidDetected) = testLogic.runRegistration(modelFiducialNode, noiseVolumeNode, testFiducialNode, resultMatrix)
+            (fre, fle, nFidDetected, procTime, wallTime) = testLogic.runRegistration(modelFiducialNode, noiseVolumeNode, testFiducialNode, resultMatrix)
                 
             tre = computeEstimatedTRE(randomMatrix, resultMatrix, 150)
-            csvFile.write('%d, %f, %f, %d, %f, %f, %f, %d\n' % (nFiducials, thickness, noise, trial, fre, fle, tre, nFidDetected))
+            csvFile.write('%d, %f, %f, %d, %f, %f, %f, %d, %f, %f\n' % (nFiducials, thickness, noise, trial, fre, fle, tre, nFidDetected, procTime, wallTime))
                 
             slicer.mrmlScene.RemoveNode(noiseVolumeNode)
 
@@ -265,10 +265,10 @@ for trial in range(0, nTrialsPerCondition):
             noiseVolumeNode = slicer.util.getNode(noiseVolumeNodeName)
                 
             resultMatrix = vtk.vtkMatrix4x4()
-            (fre, fle, nFidDetected) = testLogic.runRegistration(modelFiducialNode, noiseVolumeNode, testFiducialNode, resultMatrix)
+            (fre, fle, nFidDetected, procTime, wallTime) = testLogic.runRegistration(modelFiducialNode, noiseVolumeNode, testFiducialNode, resultMatrix)
                 
             tre = computeEstimatedTRE(randomMatrix, resultMatrix, 150)
-            csvFile.write('%d, %f, %f, %d, %f, %f, %f, %d\n' % (nFiducials, thickness, noise, trial, fre, fle, tre, nFidDetected))
+            csvFile.write('%d, %f, %f, %d, %f, %f, %f, %d, %f, %f\n' % (nFiducials, thickness, noise, trial, fre, fle, tre, nFidDetected, procTime, wallTime))
 
             slicer.mrmlScene.RemoveNode(testVolumeNode)
             slicer.mrmlScene.RemoveNode(noiseVolumeNode)
@@ -298,10 +298,10 @@ for trial in range(0, nTrialsPerCondition):
             noiseVolumeNode = slicer.util.getNode(noiseVolumeNodeName)
             
             resultMatrix = vtk.vtkMatrix4x4()
-            (fre, fle, nFidDetected) = testLogic.runRegistration(modelFiducialNode, noiseVolumeNode, testFiducialNode, resultMatrix)
+            (fre, fle, nFidDetected, procTime, wallTime) = testLogic.runRegistration(modelFiducialNode, noiseVolumeNode, testFiducialNode, resultMatrix)
         
             tre = computeEstimatedTRE(randomMatrix, resultMatrix, 150)
-            csvFile.write('%d, %f, %f, %d, %f, %f, %f, %d\n' % (nFiducials, thickness, noise, trial, fre, fle, tre, nFidDetected))
+            csvFile.write('%d, %f, %f, %d, %f, %f, %f, %d, %f, %f\n' % (nFiducials, thickness, noise, trial, fre, fle, tre, nFidDetected, procTime, wallTime))
             
             slicer.mrmlScene.RemoveNode(noiseVolumeNode)
         
