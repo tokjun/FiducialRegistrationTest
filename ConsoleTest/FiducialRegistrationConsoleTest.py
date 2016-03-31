@@ -12,7 +12,6 @@ from __main__ import vtk, qt, ctk, slicer
 from slicer.ScriptedLoadableModule import *
 
 
-
 def generateModel(modelFiducialName, radius, nFiducials, workingDir):
 
     modelFiducialNode = None
