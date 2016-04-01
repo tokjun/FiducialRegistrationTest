@@ -23,22 +23,35 @@ aggregate.errors <- function(data, xstr, condstr, paramstr) {
     return (r)
 }
 
-plot.errors.bars.sd <- function(r, xmin, xmax, ymin, ymax, title, xlabel, ylabel, xtick=10.0, ytick=1.0) {
+plot.errors.bars.sd <- function(r, xmin, xmax, ymin, ymax, title, xlabel, ylabel, xtick=10.0, ytick=1.0, xlegendpos=0.2, ylegendpos=0.8) {
     xmargin <- (xmax-xmin)*0.05
-    ebwidth <- (xmax-xmin)*0.05
-    p <- ggplot(r, aes(x=x, y=mean, group=Condition, color=Condition)) + geom_line() + geom_point() + geom_errorbar(aes(ymin=r$mean-r$sd, ymax=r$mean+r$sd), width=ebwidth, position=position_dodge(0.5)) + labs(title=title, x=xlabel, y=ylabel) + theme_classic() + scale_color_manual(values=c('#0072BE','#DA5319', '#EEB220', '#7E2F8E','#77AD30', '#4DBFEF', '#A3142F')) + scale_x_continuous(breaks=seq(xmin,xmax,xtick), limits=c(xmin-xmargin,xmax+xmargin)) +  scale_y_continuous(breaks=seq(ymin,ymax,ytick), limits=c(ymin,ymax))
+    ebwidth <- (xmax-xmin)*0.3
+    p <- ggplot(r, aes(x=x, y=mean, group=Condition))
+    p <- p + geom_line(aes(linetype=Condition, colour=Condition)) + geom_point(aes(shape=Condition, colour=Condition), size=3)
+    p <- p + geom_errorbar(aes(ymin=r$mean-r$sd, ymax=r$mean+r$sd, colour=Condition, linetype=Condition), width=ebwidth, position=position_dodge(0.1))
+    p <- p + labs(title=title, x=xlabel, y=ylabel)
+    p <- p + scale_color_manual(values=c('#0072BE','#DA5319', '#EEB220', '#7E2F8E','#77AD30', '#4DBFEF', '#A3142F'))
+    p <- p + scale_x_continuous(breaks=seq(xmin,xmax,xtick), limits=c(xmin-xmargin,xmax+xmargin)) +  scale_y_continuous(breaks=seq(ymin,ymax,ytick), limits=c(ymin,ymax))
+    p <- p + theme_bw() + theme(text = element_text(size=16), legend.key.size=unit(30, "pt"), legend.position=c(xlegendpos, ylegendpos))
+    
     print(p)
 }
 
-plot.errors.bars <- function(r, xmin, xmax, ymin, ymax, title, xlabel, ylabel, xtick=10.0, ytick=1.0) {
+plot.errors.bars <- function(r, xmin, xmax, ymin, ymax, title, xlabel, ylabel, xtick=10.0, ytick=1.0, xlegendpos=0.2, ylegendpos=0.8) {
     xmargin <- (xmax-xmin)*0.05
-    ebwidth <- (xmax-xmin)*0.05
-    p <- ggplot(r, aes(x=x, y=mean, group=Condition, color=Condition)) + geom_line() + geom_point() + geom_errorbar(aes(ymin=r$min, ymax=r$max), width=ebwidth, position=position_dodge(0.5)) + labs(title=title, x=xlabel, y=ylabel) + theme_classic() + scale_color_manual(values=c('#0072BE','#DA5319', '#EEB220', '#7E2F8E','#77AD30', '#4DBFEF', '#A3142F')) + scale_x_continuous(breaks=seq(xmin,xmax,xtick), limits=c(xmin-xmargin,xmax+xmargin)) +  scale_y_continuous(breaks=seq(ymin,ymax,ytick), limits=c(ymin,ymax))
+    ebwidth <- (xmax-xmin)*0.02
+    p <- ggplot(r, aes(x=x, y=mean, group=Condition, color=Condition))
+    p <- p + geom_line(aes(linetype=Condition, colour=Condition)) + geom_point(aes(shape=Condition, colour=Condition), size=3)
+    p <- p + geom_errorbar(aes(ymin=r$min, ymax=r$max, colour=Condition, linetype=Condition), width=ebwidth, position=position_dodge(0.1))
+    p <- p + labs(title=title, x=xlabel, y=ylabel)
+    p <- p + scale_color_manual(values=c('#0072BE','#DA5319', '#EEB220', '#7E2F8E','#77AD30', '#4DBFEF', '#A3142F'))
+    p <- p + scale_x_continuous(breaks=seq(xmin,xmax,xtick), limits=c(xmin-xmargin,xmax+xmargin)) +  scale_y_continuous(breaks=seq(ymin,ymax,ytick), limits=c(ymin,ymax))
+    p <- p + theme_bw() + theme(text = element_text(size=16), legend.key.size=unit(30, "pt"), legend.position=c(xlegendpos, ylegendpos))
     print(p)
 }
 
 ymin = 0.0
-ymax = 10.0
+ymax = 3.0
 
 ## Remove NaN
 data <- data[(!is.nan(data$FRE))&(!is.nan(data$TRE)),]
@@ -52,10 +65,10 @@ dataNoiseNfidFRE <- aggregate.errors(dataNoiseNfid, "Noise", "nFiducials", "FRE"
 dataNoiseNfidTRE <- aggregate.errors(dataNoiseNfid, "Noise", "nFiducials", "TRE")
 
 pdf("Noise-Fiducials-FRE.pdf")
-plot.errors.bars.sd(dataNoiseNfidFRE, 0, 50, ymin, ymax, "Noise vs FRE", "Noise Level (%%)", "FRE (mm)", 0.1, 1.0)
+plot.errors.bars.sd(dataNoiseNfidFRE, 0, 50, ymin, ymax, "Noise vs FRE", "Noise Level (%)", "FRE (mm)", 10, 1.0)
 dev.off()
 pdf("Noise-Fiducials-TRE.pdf")
-plot.errors.bars.sd(dataNoiseNfidTRE, 0, 50, ymin, ymax, "Noise vs TRE", "Noise Level (%%)", "TRE (mm)", 0.1, 1.0)
+plot.errors.bars.sd(dataNoiseNfidTRE, 0, 50, ymin, ymax, "Noise vs TRE", "Noise Level (%)", "TRE (mm)", 10, 1.0)
 dev.off()
 
 ##  2. Slice thickness vs number of fiducials (noise = 0.2)
@@ -64,10 +77,10 @@ dataThickNfidFRE <- aggregate.errors(dataThickNfid, "Thickness", "nFiducials", "
 dataThickNfidTRE <- aggregate.errors(dataThickNfid, "Thickness", "nFiducials", "TRE")
 
 pdf("Thickness-Fiducials-FRE.pdf")
-plot.errors.bars.sd(dataThickNfidFRE, 0, 5.0, ymin, ymax, "Slice Thickness vs FRE", "Thickness (mm)", "FRE (mm)", 1.0, 1.0)
+plot.errors.bars.sd(dataThickNfidFRE, 1.0, 4.0, ymin, ymax, "Slice Thickness vs FRE", "Thickness (mm)", "FRE (mm)", 1.0, 1.0)
 dev.off()
 pdf("Thickness-Fiducials-TRE.pdf")
-plot.errors.bars.sd(dataThickNfidTRE, 0, 5.0, ymin, ymax, "Slice Thickness vs TRE", "Thickness (mm)", "TRE (mm)", 1.0, 1.0)
+plot.errors.bars.sd(dataThickNfidTRE, 1.0, 4.0, ymin, ymax, "Slice Thickness vs TRE", "Thickness (mm)", "TRE (mm)", 1.0, 1.0)
 dev.off()
 
 ### 3. Noise vs Slice thickness  (number of fiducils = 8)
@@ -76,27 +89,22 @@ dev.off()
 #dataNoiseThickTRE <- aggregate.errors(dataNoiseThick, "Noise", "Thickness", "TRE")
 #
 #pdf("Noise-Thickness-FRE.pdf")
-#plot.errors.bars.sd(dataNoiseThickFRE, 0, 0.5, ymin, ymax, "Noise vs FRE", "Noise Level (%%)", "FRE (mm)", 0.1, 1.0)
+#plot.errors.bars.sd(dataNoiseThickFRE, 0, 0.5, ymin, ymax, "Noise vs FRE", "Noise Level (%)", "FRE (mm)", 0.1, 1.0)
 #dev.off()
 #pdf("Noise-Thickness-TRE.pdf")
-#plot.errors.bars.sd(dataNoiseThickTRE, 0, 0.5, ymin, ymax, "Noise vs TRE", "Noise Level (%%)", "TRE (mm)", 0.1, 1.0)
+#plot.errors.bars.sd(dataNoiseThickTRE, 0, 0.5, ymin, ymax, "Noise vs TRE", "Noise Level (%)", "TRE (mm)", 0.1, 1.0)
 #dev.off()
 
 
 ## 4. Thickness-Time
 ymin = 0.0
-ymax = 10.0
+ymax = 7.0
 
 dataThickNfidTime <- aggregate.errors(dataThickNfid, "Thickness", "nFiducials", "WallTime")
 pdf("Thickness-Time-FRE.pdf")
-plot.errors.bars.sd(dataThickNfidTime, 0, 5.0, ymin, ymax, "Slice Thickness vs Time", "Thickness (mm)", "Time (Wall Time) (s)", 1.0, 2.0)
+plot.errors.bars.sd(dataThickNfidTime, 1.0, 4.0, ymin, ymax, "Slice Thickness vs Time", "Thickness (mm)", "Time (Wall Time) (s)", 1.0, 2.0, 0.8, 0.8)
 dev.off()
 
-
-dataThickNfidTime <- aggregate.errors(dataThickNfid, "Thickness", "nFiducials", "WallTime")
-pdf("Thickness-Time-FRE.pdf")
-plot.errors.bars.sd(dataThickNfidTime, 0, 5.0, ymin, ymax, "Slice Thickness vs Time", "Thickness (mm)", "Time (Wall Time) (s)", 1.0, 2.0)
-dev.off()
 
 
 ## 5. Statistics:
@@ -170,33 +178,30 @@ print(sprintf("TRE for Noise=50%%: %f +/- %f (p=%f)", mean(dataNoiseNfid5$TRE), 
 
 
 
+dataNfid5 <- data[data$nFiducials==5,]
+dataNfid6 <- data[data$nFiducials==6,]
+dataNfid7 <- data[data$nFiducials==7,]
+dataNfid8 <- data[data$nFiducials==8,]
+dataNfid9 <- data[data$nFiducials==9,]
 
+testNfidFRE6 <- t.test(dataNfid5$FRE, dataNfid6$FRE, alternative="two.sided")
+testNfidFRE7 <- t.test(dataNfid5$FRE, dataNfid7$FRE, alternative="two.sided")
+testNfidFRE8 <- t.test(dataNfid5$FRE, dataNfid8$FRE, alternative="two.sided")
+testNfidFRE9 <- t.test(dataNfid5$FRE, dataNfid9$FRE, alternative="two.sided")
 
-dataNoiseNfid5 <- data[data$nFiducials==5,]
-dataNoiseNfid6 <- data[data$nFiducials==6,]
-dataNoiseNfid7 <- data[data$nFiducials==7,]
-dataNoiseNfid8 <- data[data$nFiducials==8,]
-dataNoiseNfid9 <- data[data$nFiducials==9,]
+print(sprintf("FRE for nFiducials=5: %f +/- %f", mean(dataNfid5$FRE), sd(dataNfid5$FRE)))
+print(sprintf("FRE for nFiducials=6: %f +/- %f (p=%f vs nFiducials=5)", mean(dataNfid6$FRE), sd(dataNfid6$FRE), testNfidFRE6$p.value))
+print(sprintf("FRE for nFiducials=7: %f +/- %f (p=%f vs nFiducials=5)", mean(dataNfid7$FRE), sd(dataNfid7$FRE), testNfidFRE7$p.value))
+print(sprintf("FRE for nFiducials=8: %f +/- %f (p=%f vs nFiducials=5)", mean(dataNfid8$FRE), sd(dataNfid8$FRE), testNfidFRE8$p.value))
+print(sprintf("FRE for nFiducials=9: %f +/- %f (p=%f vs nFiducials=5)", mean(dataNfid9$FRE), sd(dataNfid9$FRE), testNfidFRE9$p.value))
 
-testNoiseNfidFRE6 <- t.test(dataNoiseNfid5$FRE, dataNoiseNfid6$FRE, alternative="two.sided")
-testNoiseNfidFRE7 <- t.test(dataNoiseNfid5$FRE, dataNoiseNfid7$FRE, alternative="two.sided")
-testNoiseNfidFRE8 <- t.test(dataNoiseNfid5$FRE, dataNoiseNfid8$FRE, alternative="two.sided")
-testNoiseNfidFRE9 <- t.test(dataNoiseNfid5$FRE, dataNoiseNfid9$FRE, alternative="two.sided")
+testNfidTRE6 <- t.test(dataNfid5$TRE, dataNfid6$TRE, alternative="two.sided")
+testNfidTRE7 <- t.test(dataNfid5$TRE, dataNfid7$TRE, alternative="two.sided")
+testNfidTRE8 <- t.test(dataNfid5$TRE, dataNfid8$TRE, alternative="two.sided")
+testNfidTRE9 <- t.test(dataNfid5$TRE, dataNfid9$TRE, alternative="two.sided")
 
-print(sprintf("FRE for nFiducials=5: %f +/- %f", mean(dataNoiseNfid5$FRE), sd(dataNoiseNfid5$FRE)))
-print(sprintf("FRE for nFiducials=6: %f +/- %f (p=%f vs nFiducials=5)", mean(dataNoiseNfid6$FRE), sd(dataNoiseNfid6$FRE), testNoiseNfidFRE6$p.value))
-print(sprintf("FRE for nFiducials=7: %f +/- %f (p=%f vs nFiducials=5)", mean(dataNoiseNfid7$FRE), sd(dataNoiseNfid7$FRE), testNoiseNfidFRE7$p.value))
-print(sprintf("FRE for nFiducials=8: %f +/- %f (p=%f vs nFiducials=5)", mean(dataNoiseNfid8$FRE), sd(dataNoiseNfid8$FRE), testNoiseNfidFRE8$p.value))
-print(sprintf("FRE for nFiducials=9: %f +/- %f (p=%f vs nFiducials=5)", mean(dataNoiseNfid9$FRE), sd(dataNoiseNfid9$FRE), testNoiseNfidFRE9$p.value))
-
-
-testThickNfidTRE6 <- t.test(dataThickNfid5$TRE, dataThickNfid6$TRE, alternative="two.sided")
-testThickNfidTRE7 <- t.test(dataThickNfid5$TRE, dataThickNfid7$TRE, alternative="two.sided")
-testThickNfidTRE8 <- t.test(dataThickNfid5$TRE, dataThickNfid8$TRE, alternative="two.sided")
-testThickNfidTRE9 <- t.test(dataThickNfid5$TRE, dataThickNfid9$TRE, alternative="two.sided")
-
-print(sprintf("TRE for nFiducials=5: %f +/- %f", mean(dataThickNfid5$TRE), sd(dataThickNfid5$TRE)))
-print(sprintf("TRE for nFiducials=6: %f +/- %f (p=%f vs nFiducials=5)", mean(dataThickNfid6$TRE), sd(dataThickNfid6$TRE), testThickNfidTRE6$p.value))
-print(sprintf("TRE for nFiducials=7: %f +/- %f (p=%f vs nFiducials=5)", mean(dataThickNfid7$TRE), sd(dataThickNfid7$TRE), testThickNfidTRE7$p.value))
-print(sprintf("TRE for nFiducials=8: %f +/- %f (p=%f vs nFiducials=5)", mean(dataThickNfid8$TRE), sd(dataThickNfid8$TRE), testThickNfidTRE8$p.value))
-print(sprintf("TRE for nFiducials=9: %f +/- %f (p=%f vs nFiducials=5)", mean(dataThickNfid9$TRE), sd(dataThickNfid9$TRE), testThickNfidTRE9$p.value))
+print(sprintf("TRE for nFiducials=5: %f +/- %f", mean(dataNfid5$TRE), sd(dataNfid5$TRE)))
+print(sprintf("TRE for nFiducials=6: %f +/- %f (p=%f vs nFiducials=5)", mean(dataNfid6$TRE), sd(dataNfid6$TRE), testNfidTRE6$p.value))
+print(sprintf("TRE for nFiducials=7: %f +/- %f (p=%f vs nFiducials=5)", mean(dataNfid7$TRE), sd(dataNfid7$TRE), testNfidTRE7$p.value))
+print(sprintf("TRE for nFiducials=8: %f +/- %f (p=%f vs nFiducials=5)", mean(dataNfid8$TRE), sd(dataNfid8$TRE), testNfidTRE8$p.value))
+print(sprintf("TRE for nFiducials=9: %f +/- %f (p=%f vs nFiducials=5)", mean(dataNfid9$TRE), sd(dataNfid9$TRE), testNfidTRE9$p.value))
