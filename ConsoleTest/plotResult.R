@@ -205,3 +205,4 @@ print(sprintf("TRE for nFiducials=6: %f +/- %f (p=%f vs nFiducials=5)", mean(dat
 print(sprintf("TRE for nFiducials=7: %f +/- %f (p=%f vs nFiducials=5)", mean(dataNfid7$TRE), sd(dataNfid7$TRE), testNfidTRE7$p.value))
 print(sprintf("TRE for nFiducials=8: %f +/- %f (p=%f vs nFiducials=5)", mean(dataNfid8$TRE), sd(dataNfid8$TRE), testNfidTRE8$p.value))
 print(sprintf("TRE for nFiducials=9: %f +/- %f (p=%f vs nFiducials=5)", mean(dataNfid9$TRE), sd(dataNfid9$TRE), testNfidTRE9$p.value))
+
